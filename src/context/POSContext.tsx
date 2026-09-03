@@ -22,6 +22,10 @@ import {
   TableOrderRound,
   WifiPrinterConfig,
   Daraja3Config,
+  Supplier,
+  PurchaseRecord,
+  StockMovement,
+  AuditLog,
 } from '../types/pos';
 import {
   INITIAL_BUSINESSES,
@@ -58,6 +62,9 @@ import {
   initiateDaraja3StkPush,
   StkPushResult,
 } from '../utils/darajaService';
+import { db, auth } from '../lib/firebase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 export interface CheckoutTargetInfo {
   tableId?: string;
@@ -79,6 +86,15 @@ interface POSContextType {
   updateBusiness: (updated: Partial<BusinessTenant>) => void;
   businessMode: BusinessMode;
   setBusinessMode: (mode: BusinessMode) => void;
+  isTenantSelected: boolean;
+  isTenantLoading: boolean;
+  loadingTenantName: string;
+  accessDenied: boolean;
+  accessDeniedMessage: string;
+  openTenantPOS: (tenantId: string) => void;
+  exitTenant: () => void;
+  logoutPlatform: () => void;
+  clearAccessDenied: () => void;
 
   // Cashier & Shifts
   cashiers: CashierUser[];
@@ -96,6 +112,23 @@ interface POSContextType {
   addCashierUser: (user: Omit<CashierUser, 'id'>) => void;
   updateCashierUser: (userId: string, updated: Partial<CashierUser>) => void;
   deleteCashierUser: (userId: string) => boolean;
+  toggleCashierStatus: (userId: string) => void;
+  resetCashierPassword: (userId: string, newPin: string) => void;
+
+  // Chemist & Supply chain
+  suppliers: Supplier[];
+  addSupplier: (sup: Omit<Supplier, 'id' | 'businessId'>) => void;
+  updateSupplier: (supId: string, updated: Partial<Supplier>) => void;
+  deleteSupplier: (supId: string) => void;
+
+  purchases: PurchaseRecord[];
+  addPurchaseRecord: (record: Omit<PurchaseRecord, 'id' | 'businessId' | 'date'>) => void;
+
+  stockMovements: StockMovement[];
+  adjustStock: (productId: string, newStock: number, reason: string) => void;
+
+  auditLogs: AuditLog[];
+  logAuditAction: (action: string, details: string, recordAffected: string) => void;
   verifyManagerPin: (pin: string) => boolean;
   reprintReceipt: (order: OrderRecord) => void;
   showManagerAuthModal: boolean;
@@ -119,10 +152,26 @@ interface POSContextType {
   updateProduct: (productId: string, updated: Partial<ProductItem>) => void;
   addProduct: (product: Omit<ProductItem, 'id'>) => void;
   deleteProduct: (productId: string) => void;
+  editingProduct: ProductItem | null;
+  setEditingProduct: (product: ProductItem | null) => void;
+  isManageItemsMode: boolean;
+  setIsManageItemsMode: (enabled: boolean | ((prev: boolean) => boolean)) => void;
 
   // Cart & Active Order
   cart: CartItem[];
   addToCart: (product: ProductItem, modifiers?: CartModifierSelection[], notes?: string) => void;
+  updateCartItem: (
+    cartItemId: string,
+    updates: {
+      quantity?: number;
+      unitPrice?: number;
+      itemDiscountPercent?: number;
+      itemNotes?: string;
+      selectedModifiers?: CartModifierSelection[];
+    }
+  ) => void;
+  editingCartItem: CartItem | null;
+  setEditingCartItem: (item: CartItem | null) => void;
   updateCartQuantity: (cartItemId: string, delta: number) => void;
   setCartItemQuantity: (cartItemId: string, quantity: number) => void;
   removeCartItem: (cartItemId: string) => void;
@@ -287,6 +336,14 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return businesses.find((b) => b.id === currentBusinessId) || businesses[0];
   }, [businesses, currentBusinessId]);
 
+  const [isTenantSelected, setIsTenantSelected] = useState<boolean>(() => {
+    return localStorage.getItem('davetech_is_tenant_selected') === 'true';
+  });
+  const [isTenantLoading, setIsTenantLoading] = useState<boolean>(false);
+  const [loadingTenantName, setLoadingTenantName] = useState<string>('');
+  const [accessDenied, setAccessDenied] = useState<boolean>(false);
+  const [accessDeniedMessage, setAccessDeniedMessage] = useState<string>('');
+
   const [cashiers, setCashiers] = useState<CashierUser[]>(() => {
     const saved = localStorage.getItem('davetech_cashiers');
     if (saved) {
@@ -311,6 +368,151 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return INITIAL_CASHIERS[0];
   });
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
+    const saved = localStorage.getItem('davetech_suppliers');
+    return saved
+      ? JSON.parse(saved)
+      : [
+          {
+            id: 'sup-1',
+            businessId: currentBusinessId,
+            name: 'Alpha Pharma Ltd',
+            contactPerson: 'Dr. Robert Kiprop',
+            phone: '+254 711 100 200',
+            email: 'orders@alphapharma.co.ke',
+            address: 'Industrial Area, Nairobi',
+          },
+          {
+            id: 'sup-2',
+            businessId: currentBusinessId,
+            name: 'Galaxy Medical Supplies',
+            contactPerson: 'Susan Wanjiku',
+            phone: '+254 722 300 400',
+            email: 'sales@galaxymed.co.ke',
+            address: 'Mombasa Road, Nairobi',
+          },
+        ];
+  });
+
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
+    const saved = localStorage.getItem('davetech_purchases');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>(() => {
+    const saved = localStorage.getItem('davetech_stock_movements');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+    const saved = localStorage.getItem('davetech_audit_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('davetech_suppliers', JSON.stringify(suppliers));
+  }, [suppliers]);
+
+  useEffect(() => {
+    localStorage.setItem('davetech_purchases', JSON.stringify(purchases));
+  }, [purchases]);
+
+  useEffect(() => {
+    localStorage.setItem('davetech_stock_movements', JSON.stringify(stockMovements));
+  }, [stockMovements]);
+
+  useEffect(() => {
+    localStorage.setItem('davetech_audit_logs', JSON.stringify(auditLogs));
+  }, [auditLogs]);
+
+  const logAuditAction = useCallback((action: string, details: string, recordAffected: string) => {
+    const newLog: AuditLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      businessId: currentBusinessId,
+      userId: currentCashier?.id || 'system',
+      userName: currentCashier?.name || 'System Administrator',
+      action,
+      details,
+      recordAffected,
+      timestamp: new Date().toISOString(),
+    };
+    setAuditLogs((prev) => [newLog, ...prev]);
+  }, [currentBusinessId, currentCashier]);
+
+  const addSupplier = useCallback((sup: Omit<Supplier, 'id' | 'businessId'>) => {
+    const newSup: Supplier = {
+      ...sup,
+      id: `sup-${Date.now()}`,
+      businessId: currentBusinessId,
+    };
+    setSuppliers((prev) => [...prev, newSup]);
+    logAuditAction('SUPPLIER_ADDED', `Added supplier ${newSup.name}`, newSup.id);
+  }, [currentBusinessId, logAuditAction]);
+
+  const updateSupplier = useCallback((supId: string, updated: Partial<Supplier>) => {
+    setSuppliers((prev) => prev.map((s) => (s.id === supId ? { ...s, ...updated } : s)));
+    logAuditAction('SUPPLIER_UPDATED', `Updated supplier ID ${supId}`, supId);
+  }, [logAuditAction]);
+
+  const deleteSupplier = useCallback((supId: string) => {
+    setSuppliers((prev) => prev.filter((s) => s.id !== supId));
+    logAuditAction('SUPPLIER_DELETED', `Deleted supplier ID ${supId}`, supId);
+  }, [logAuditAction]);
+
+  const addPurchaseRecord = useCallback((record: Omit<PurchaseRecord, 'id' | 'businessId' | 'date'>) => {
+    const newPur: PurchaseRecord = {
+      ...record,
+      id: `pur-${Date.now()}`,
+      businessId: currentBusinessId,
+      date: new Date().toISOString(),
+      cashierName: currentCashier?.name || 'Manager',
+    };
+    setPurchases((prev) => [newPur, ...prev]);
+
+    setProducts((prevProds) => {
+      return prevProds.map((prod) => {
+        const itemDetail = record.items.find((i) => i.productId === prod.id);
+        if (!itemDetail) return prod;
+        const currentStock = prod.stock ?? 0;
+        const newStock = currentStock + itemDetail.quantity;
+        return {
+          ...prod,
+          stock: newStock,
+          batchNumber: itemDetail.batchNumber || prod.batchNumber,
+          expiryDate: itemDetail.expiryDate || prod.expiryDate,
+        };
+      });
+    });
+
+    logAuditAction('PURCHASE_RECORDED', `Recorded purchase from ${record.supplierName} total ${record.totalAmount}`, newPur.id);
+  }, [currentBusinessId, currentCashier, logAuditAction]);
+
+  const adjustStock = useCallback((productId: string, newStock: number, reason: string) => {
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (p.id !== productId) return p;
+        const prevStock = p.stock ?? 0;
+        const delta = newStock - prevStock;
+        const movement: StockMovement = {
+          id: `mov-${Date.now()}`,
+          businessId: currentBusinessId,
+          productId,
+          productName: p.name,
+          type: 'adjustment',
+          quantityDelta: delta,
+          previousStock: prevStock,
+          newStock,
+          reason,
+          timestamp: new Date().toISOString(),
+          cashierName: currentCashier?.name || 'Manager',
+        };
+        setStockMovements((m) => [movement, ...m]);
+        return { ...p, stock: newStock };
+      })
+    );
+    logAuditAction('STOCK_ADJUSTED', `Adjusted stock for product ID ${productId} to ${newStock} (${reason})`, productId);
+  }, [currentBusinessId, currentCashier, logAuditAction]);
 
   const [activeShift, setActiveShift] = useState<ShiftRecord | null>(() => {
     return {
@@ -345,8 +547,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedCategory, setSelectedCategory] = useState<string>('cat-food');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'inventory' | 'non_inventory'>('all');
+  const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
+  const [isManageItemsMode, setIsManageItemsMode] = useState<boolean>(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
   const [orderType, setOrderType] = useState<OrderType>('dine_in');
   const [selectedTable, setSelectedTable] = useState<TableInfo | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<HotelRoomInfo | null>(null);
@@ -929,6 +1134,8 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (found) {
       setCurrentBusinessId(bizId);
       clearCart();
+      setCurrentViewState('pos');
+      logAuditAction('TENANT_LOGIN', `Logged in / switched to tenant workspace: ${found.name} (${found.id})`, bizId);
     }
   };
 
@@ -978,7 +1185,30 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const remaining = cashiers.filter((c) => c.id !== userId);
       setCurrentCashier(remaining[0] || null);
     }
+    logAuditAction('CASHIER_DELETED', `Deleted cashier ID ${userId}`, userId);
     return true;
+  };
+
+  const toggleCashierStatus = (userId: string) => {
+    soundFx.playClick();
+    setCashiers((prev) =>
+      prev.map((c) => {
+        if (c.id === userId) {
+          const newStatus = c.status === 'inactive' ? 'active' : 'inactive';
+          return { ...c, status: newStatus as any };
+        }
+        return c;
+      })
+    );
+    logAuditAction('CASHIER_STATUS_TOGGLED', `Toggled status for cashier ID ${userId}`, userId);
+  };
+
+  const resetCashierPassword = (userId: string, newPin: string) => {
+    soundFx.playSuccess();
+    setCashiers((prev) =>
+      prev.map((c) => (c.id === userId ? { ...c, pin: newPin } : c))
+    );
+    logAuditAction('CASHIER_PIN_RESET', `Reset PIN for cashier ID ${userId}`, userId);
   };
 
   // Cashier Auth & Shifts
@@ -1097,8 +1327,20 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateProduct = (productId: string, updated: Partial<ProductItem>) => {
+    soundFx.playSuccess();
     setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, ...updated } : p))
+      prev.map((p) => {
+        if (p.id === productId) {
+          const merged = { ...p, ...updated };
+          if (db) {
+            setDoc(doc(db, 'products', productId), merged, { merge: true }).catch((err) =>
+              console.warn('[Firestore] Product update sync:', err)
+            );
+          }
+          return merged;
+        }
+        return p;
+      })
     );
   };
 
@@ -1109,14 +1351,63 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `prod-custom-${Date.now()}`,
     };
     setProducts((prev) => [newProd, ...prev]);
+    if (db) {
+      setDoc(doc(db, 'products', newProd.id), newProd, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Product add sync:', err)
+      );
+    }
   };
 
   const deleteProduct = (productId: string) => {
     soundFx.playClick();
     setProducts((prev) => prev.filter((p) => p.id !== productId));
+    if (db) {
+      deleteDoc(doc(db, 'products', productId)).catch((err) =>
+        console.warn('[Firestore] Product delete sync:', err)
+      );
+    }
   };
 
   // Cart Operations
+  const updateCartItem = (
+    cartItemId: string,
+    updates: {
+      quantity?: number;
+      unitPrice?: number;
+      itemDiscountPercent?: number;
+      itemNotes?: string;
+      selectedModifiers?: CartModifierSelection[];
+    }
+  ) => {
+    soundFx.playSuccess();
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.cartItemId === cartItemId) {
+            const newQty = updates.quantity !== undefined ? updates.quantity : item.quantity;
+            if (newQty <= 0) return null;
+            const newUnitPrice = updates.unitPrice !== undefined ? updates.unitPrice : item.unitPrice;
+            const newDisc = updates.itemDiscountPercent !== undefined
+              ? Math.min(100, Math.max(0, updates.itemDiscountPercent))
+              : item.itemDiscountPercent;
+            const newNotes = updates.itemNotes !== undefined ? updates.itemNotes : item.itemNotes;
+            const newModifiers = updates.selectedModifiers !== undefined ? updates.selectedModifiers : item.selectedModifiers;
+
+            return {
+              ...item,
+              quantity: newQty,
+              unitPrice: newUnitPrice,
+              itemDiscountPercent: newDisc,
+              itemNotes: newNotes,
+              selectedModifiers: newModifiers,
+              totalPrice: newUnitPrice * (1 - newDisc / 100) * newQty,
+            };
+          }
+          return item;
+        })
+        .filter(Boolean) as CartItem[]
+    );
+  };
   const addToCart = (
     product: ProductItem,
     modifiers: CartModifierSelection[] = [],
@@ -1239,6 +1530,59 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedTable(null);
     setSelectedRoom(null);
   };
+
+  const openTenantPOS = useCallback((tenantId: string) => {
+    const found = businesses.find((b) => b.id === tenantId);
+    if (!found) {
+      setAccessDenied(true);
+      setAccessDeniedMessage('The requested tenant business does not exist or has been removed.');
+      return;
+    }
+
+    if (found.status === 'suspended') {
+      setAccessDenied(true);
+      setAccessDeniedMessage(`Tenant "${found.name}" is currently suspended by DAVETECH Platform Administrator.`);
+      return;
+    }
+
+    setLoadingTenantName(found.name);
+    setIsTenantLoading(true);
+    soundFx.playClick();
+
+    setTimeout(() => {
+      setCurrentBusinessId(tenantId);
+      localStorage.setItem('davetech_current_biz_id', tenantId);
+      localStorage.setItem('davetech_is_tenant_selected', 'true');
+      setIsTenantSelected(true);
+      setIsTenantLoading(false);
+      clearCart();
+      setCurrentView('pos');
+    }, 600);
+  }, [businesses]);
+
+  const exitTenant = useCallback(() => {
+    soundFx.playClick();
+    setIsTenantSelected(false);
+    localStorage.removeItem('davetech_is_tenant_selected');
+    clearCart();
+  }, [clearCart]);
+
+  const logoutPlatform = useCallback(() => {
+    soundFx.playClick();
+    signOut(auth).then(() => {
+      setIsTenantSelected(false);
+      localStorage.removeItem('davetech_is_tenant_selected');
+      localStorage.removeItem('davetech_current_biz_id');
+      window.location.reload();
+    }).catch(() => {
+      window.location.reload();
+    });
+  }, []);
+
+  const clearAccessDenied = useCallback(() => {
+    setAccessDenied(false);
+    setAccessDeniedMessage('');
+  }, []);
 
   // Real-time Cart Totals
   const cartTotals = useMemo(() => {
@@ -2154,6 +2498,15 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateBusiness,
         businessMode,
         setBusinessMode,
+        isTenantSelected,
+        isTenantLoading,
+        loadingTenantName,
+        accessDenied,
+        accessDeniedMessage,
+        openTenantPOS,
+        exitTenant,
+        logoutPlatform,
+        clearAccessDenied,
         cashiers,
         currentCashier,
         activeShift,
@@ -2167,6 +2520,18 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addCashierUser,
         updateCashierUser,
         deleteCashierUser,
+        toggleCashierStatus,
+        resetCashierPassword,
+        suppliers,
+        addSupplier,
+        updateSupplier,
+        deleteSupplier,
+        purchases,
+        addPurchaseRecord,
+        stockMovements,
+        adjustStock,
+        auditLogs,
+        logAuditAction,
         verifyManagerPin,
         reprintReceipt,
         showManagerAuthModal,
@@ -2188,8 +2553,15 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateProduct,
         addProduct,
         deleteProduct,
+        editingProduct,
+        setEditingProduct,
+        isManageItemsMode,
+        setIsManageItemsMode,
         cart,
         addToCart,
+        updateCartItem,
+        editingCartItem,
+        setEditingCartItem,
         updateCartQuantity,
         setCartItemQuantity,
         removeCartItem,

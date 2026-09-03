@@ -5,6 +5,7 @@ import {
   Package,
   X,
   Check,
+  Edit2,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ProductItem, CartModifierSelection } from '../types/pos';
@@ -18,6 +19,8 @@ export const ProductGrid: React.FC = () => {
     addToCart,
     cart,
     currencySymbol,
+    setEditingProduct,
+    isManageItemsMode,
   } = usePOS();
 
   const [customizingProduct, setCustomizingProduct] = useState<ProductItem | null>(null);
@@ -115,6 +118,11 @@ export const ProductGrid: React.FC = () => {
                 <div
                   key={product.id}
                   onClick={() => {
+                    if (isManageItemsMode) {
+                      soundFx.playClick();
+                      setEditingProduct(product);
+                      return;
+                    }
                     if (isOutOfStock) return;
                     if (hasModifiers) {
                       handleOpenCustomize(product, { stopPropagation: () => {} } as React.MouseEvent);
@@ -129,6 +137,25 @@ export const ProductGrid: React.FC = () => {
                   } ${isOutOfStock ? 'opacity-60 bg-slate-100' : ''}`}
                   id={`product-card-${product.id}`}
                 >
+                  {/* Edit/Delete Product Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      soundFx.playClick();
+                      setEditingProduct(product);
+                    }}
+                    className={`absolute top-2 left-2 z-10 p-1.5 rounded-xl backdrop-blur-md transition-all shadow-xs cursor-pointer ${
+                      isManageItemsMode
+                        ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-300 scale-105'
+                        : 'bg-white/90 hover:bg-white text-slate-700 hover:text-emerald-700 opacity-80 group-hover:opacity-100'
+                    }`}
+                    title={`Edit details or delete ${product.name}`}
+                    id={`btn-edit-product-${product.id}`}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+
                   {/* Cart Quantity Badge */}
                   {inCartCount > 0 && (
                     <div className="absolute -top-2 -right-2 z-10 w-7 h-7 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-md border-2 border-white animate-in zoom-in-50">

@@ -21,6 +21,15 @@ import { ManagerAuthModal } from './components/ManagerAuthModal';
 import { WifiPrinterModal } from './components/WifiPrinterModal';
 import { OfflineStatusBanner } from './components/OfflineStatusBanner';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
+import { EditCartItemModal } from './components/EditCartItemModal';
+import { EditProductModal } from './components/EditProductModal';
+import { ChemistView } from './components/ChemistView';
+import { PurchasesView } from './components/PurchasesView';
+import { SuppliersView } from './components/SuppliersView';
+import { StaffView } from './components/StaffView';
+import { SettingsView } from './components/SettingsView';
+import { SuperAdminView } from './components/SuperAdminView';
+import { PlatformGateway } from './components/PlatformGateway';
 
 const POSMainLayout: React.FC = () => {
   const { currentView, isHighContrast, cart, cartTotals, currencySymbol, selectedTable } = usePOS();
@@ -157,13 +166,34 @@ const POSMainLayout: React.FC = () => {
           />
         )}
 
+        {/* Chemist / Pharmacy POS View */}
+        {currentView === 'chemist' && (
+          <ChemistView
+            onOpenBarcodeScanner={() => setIsBarcodeModalOpen(true)}
+            onOpenCheckout={() => setIsCheckoutOpen(true)}
+          />
+        )}
+
+        {/* Purchases View */}
+        {currentView === 'purchases' && <PurchasesView />}
+
+        {/* Suppliers View */}
+        {currentView === 'suppliers' && <SuppliersView />}
+
+        {/* Users & Staff View */}
+        {currentView === 'users' && <StaffView />}
+
+        {/* Settings Administration View */}
+        {currentView === 'settings' && <SettingsView />}
+
+        {/* Super Admin Platform Control Center */}
+        {currentView === 'super_admin' && <SuperAdminView />}
+
         {/* Manager Dashboard & Dedicated Manager Views */}
         {(currentView === 'dashboard' ||
           currentView === 'products' ||
           currentView === 'inventory' ||
-          currentView === 'reports' ||
-          currentView === 'users' ||
-          currentView === 'settings') && <OwnerDashboard />}
+          currentView === 'reports') && <OwnerDashboard />}
       </main>
 
       {/* Modals & Dialogs */}
@@ -203,14 +233,26 @@ const POSMainLayout: React.FC = () => {
         isOpen={isOfflineModalOpen}
         onClose={() => setIsOfflineModalOpen(false)}
       />
+
+      {/* Item Editing & Deletion Modals */}
+      <EditCartItemModal />
+      <EditProductModal />
     </div>
   );
+};
+
+const AppContent: React.FC = () => {
+  const { isTenantSelected } = usePOS();
+  if (!isTenantSelected) {
+    return <PlatformGateway />;
+  }
+  return <POSMainLayout />;
 };
 
 export default function App() {
   return (
     <POSProvider>
-      <POSMainLayout />
+      <AppContent />
     </POSProvider>
   );
 }

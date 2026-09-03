@@ -1,18 +1,102 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /transactions/{transactionId} {
-      allow read, write: if request.auth != null || true;
+
+    function isSignedIn() {
+      return request.auth != null;
     }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'breakthroughcollege03@gmail.com' ||
+        exists(/databases/$(database)/documents/superAdmins/$(request.auth.uid))
+      );
+    }
+
+    function getUserTenantId() {
+      return get(/databases/$(database)/documents/tenantUsers/$(request.auth.uid)).data.tenantId;
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || (isSignedIn() && getUserTenantId() == tenantId);
+    }
+
+    match /tenantUsers/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || request.auth.uid == userId;
+    }
+
+    match /superAdmins/{adminId} {
+      allow read, write: if isSuperAdmin();
+    }
+
     match /products/{productId} {
-      allow read: if true;
-      allow write: if request.auth != null || true;
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
     }
+
+    match /sales/{saleId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /orders/{orderId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /payments/{paymentId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /inventory/{inventoryId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /suppliers/{supplierId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /receipts/{receiptId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /auditLogs/{logId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /purchases/{purchaseId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /stockMovements/{movementId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /categories/{categoryId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /customers/{customerId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
     match /shifts/{shiftId} {
-      allow read, write: if request.auth != null || true;
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
     }
+
+    match /tables/{tableId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
+    match /rooms/{roomId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+    }
+
     match /{document=**} {
-      allow read, write: if request.auth != null || true;
+      allow read, write: if isSuperAdmin();
     }
   }
 }

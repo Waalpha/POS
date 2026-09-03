@@ -11,6 +11,8 @@ import {
   Barcode,
   X,
   Zap,
+  Plus,
+  Edit2,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { soundFx } from '../utils/audio';
@@ -31,6 +33,9 @@ export const CategoryNav: React.FC<CategoryNavProps> = ({
     products,
     searchQuery,
     setSearchQuery,
+    setEditingProduct,
+    isManageItemsMode,
+    setIsManageItemsMode,
   } = usePOS();
 
   // Helper icon mapper for large touchscreen icons
@@ -120,12 +125,56 @@ export const CategoryNav: React.FC<CategoryNavProps> = ({
         {/* Barcode Scanner Button */}
         <button
           onClick={onOpenBarcodeScanner}
-          className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200 shadow-xs transition-all shrink-0 cursor-pointer"
+          className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 font-bold text-xs rounded-2xl border border-slate-200 shadow-xs transition-all shrink-0 cursor-pointer"
           title="Scan barcode with camera / handheld scanner"
           id="btn-open-scanner"
         >
           <Barcode className="w-4 h-4 text-slate-600" />
           <span className="hidden sm:inline">Scanner</span>
+        </button>
+
+        {/* Add New Item Button */}
+        <button
+          onClick={() => {
+            soundFx.playClick();
+            setEditingProduct({
+              id: `new-${Date.now()}`,
+              name: '',
+              price: 0,
+              costPrice: 0,
+              categoryId: selectedCategory !== 'all' ? selectedCategory : 'cat-food',
+              isInventory: true,
+              stock: 50,
+              reorderLevel: 10,
+              imageUrl: '',
+              isAvailable: true,
+              businessModes: ['restaurant', 'bar', 'hotel', 'retail', 'services'],
+            });
+          }}
+          className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 font-bold text-xs rounded-2xl border border-slate-200 shadow-xs transition-all shrink-0 cursor-pointer"
+          title="Add new item to product catalog"
+          id="btn-add-item-trigger"
+        >
+          <Plus className="w-4 h-4 text-emerald-600" />
+          <span className="hidden sm:inline">Add Item</span>
+        </button>
+
+        {/* Toggle Edit Mode Button */}
+        <button
+          onClick={() => {
+            soundFx.playClick();
+            setIsManageItemsMode((prev) => !prev);
+          }}
+          className={`flex items-center justify-center gap-1.5 px-3 py-2.5 active:scale-95 font-bold text-xs rounded-2xl border transition-all shrink-0 cursor-pointer ${
+            isManageItemsMode
+              ? 'bg-amber-500 border-amber-500 text-white shadow-xs'
+              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-xs'
+          }`}
+          title="Toggle edit/delete mode on products"
+          id="btn-toggle-edit-mode"
+        >
+          <Edit2 className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">{isManageItemsMode ? 'Done' : 'Edit Items'}</span>
         </button>
       </div>
 

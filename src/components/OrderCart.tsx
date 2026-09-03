@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ShoppingBag,
   Trash2,
+  Edit2,
   Plus,
   Minus,
   Tag,
@@ -68,6 +69,7 @@ export const OrderCart: React.FC<OrderCartProps> = ({
     currencySymbol,
     openCustomerBill,
     openDirectCartPayment,
+    setEditingCartItem,
   } = usePOS();
 
   const [showDiscountModal, setShowDiscountModal] = useState<boolean>(false);
@@ -516,18 +518,44 @@ export const OrderCart: React.FC<OrderCartProps> = ({
               />
 
               {/* Item Info */}
-              <div className="flex-1 min-w-0">
+              <div
+                className="flex-1 min-w-0 cursor-pointer"
+                onClick={() => {
+                  soundFx.playClick();
+                  setEditingCartItem(item);
+                }}
+                title="Tap to edit item options, price, quantity, or notes"
+              >
                 <div className="flex items-start justify-between gap-1">
-                  <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-tight truncate">
+                  <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-tight truncate hover:text-emerald-700 transition-colors">
                     {item.product.name}
                   </h4>
-                  <button
-                    onClick={() => removeCartItem(item.cartItemId)}
-                    className="p-1 text-slate-300 hover:text-rose-600 transition-colors shrink-0 cursor-pointer"
-                    title="Remove item"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setEditingCartItem(item);
+                      }}
+                      className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                      title="Edit item"
+                      id={`btn-edit-cart-item-${item.cartItemId}`}
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        removeCartItem(item.cartItemId);
+                      }}
+                      className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      title="Remove item"
+                      id={`btn-delete-cart-item-${item.cartItemId}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Modifiers & Notes */}

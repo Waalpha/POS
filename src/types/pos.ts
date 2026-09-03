@@ -1,4 +1,13 @@
-export type BusinessMode = 'restaurant' | 'hotel' | 'shop' | 'bar' | 'services';
+export type BusinessMode =
+  | 'restaurant'
+  | 'hotel'
+  | 'shop'
+  | 'bar'
+  | 'services'
+  | 'chemist'
+  | 'supermarket'
+  | 'wholesale'
+  | 'pos';
 
 export type PaymentMethod = 'cash' | 'mpesa' | 'card' | 'split' | 'room_charge';
 
@@ -40,6 +49,9 @@ export interface Daraja3Config {
   lastTestMessage?: string;
 }
 
+export type DomainStatus = 'active' | 'pending' | 'verification_required' | 'verifying' | 'failed' | 'suspended' | 'removed';
+export type DomainType = 'subdomain' | 'custom';
+
 export interface BusinessTenant {
   id: string;
   name: string;
@@ -60,6 +72,26 @@ export interface BusinessTenant {
   mpesaPaybillNumber: string; // e.g. '247247'
   mpesaAccountInstructions: string; // e.g. 'Table Number or Guest Name'
   daraja3Config?: Daraja3Config;
+  status?: 'active' | 'suspended';
+  subscriptionPlan?: 'Standard' | 'Professional' | 'Enterprise';
+  createdAt?: string;
+  adminName?: string;
+  adminEmail?: string;
+  // Domain & Subdomain properties
+  slug?: string;
+  subdomain?: string;
+  customDomain?: string;
+  domainStatus?: DomainStatus;
+  domainType?: DomainType;
+  verificationToken?: string;
+  verifiedAt?: string;
+}
+
+export function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'tenant';
 }
 
 export type UserRole = 'manager' | 'cashier';
@@ -74,20 +106,26 @@ export interface CashierUser {
   email?: string;
   status?: 'active' | 'inactive';
   activeShiftId?: string;
+  lastLogin?: string;
+  assignedPosId?: string;
 }
 
 export type POSViewType =
   | 'pos'
+  | 'chemist'
   | 'tables'
   | 'orders'
   | 'dashboard'
   | 'products'
   | 'inventory'
+  | 'purchases'
+  | 'suppliers'
   | 'reports'
   | 'users'
   | 'settings'
   | 'kds'
-  | 'rooms';
+  | 'rooms'
+  | 'super_admin';
 
 export interface ShiftRecord {
   id: string;
@@ -118,6 +156,71 @@ export interface ProductCategory {
   applicableModes?: BusinessMode[];
 }
 
+export interface ProductBatch {
+  id: string;
+  batchNumber: string;
+  expiryDate: string;
+  stock: number;
+  costPrice: number;
+}
+
+export interface Supplier {
+  id: string;
+  businessId: string;
+  name: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  address: string;
+  suppliedCategories?: string[];
+}
+
+export interface PurchaseItemDetail {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitCost: number;
+  batchNumber?: string;
+  expiryDate?: string;
+}
+
+export interface PurchaseRecord {
+  id: string;
+  businessId: string;
+  supplierId: string;
+  supplierName: string;
+  date: string;
+  items: PurchaseItemDetail[];
+  totalAmount: number;
+  status: 'received' | 'pending' | 'cancelled';
+  cashierName?: string;
+}
+
+export interface StockMovement {
+  id: string;
+  businessId: string;
+  productId: string;
+  productName: string;
+  type: 'purchase' | 'sale' | 'adjustment' | 'return' | 'damage';
+  quantityDelta: number;
+  previousStock: number;
+  newStock: number;
+  reason: string;
+  timestamp: string;
+  cashierName: string;
+}
+
+export interface AuditLog {
+  id: string;
+  businessId: string;
+  userId: string;
+  userName: string;
+  action: string;
+  details: string;
+  recordAffected: string;
+  timestamp: string;
+}
+
 export interface ProductItem {
   id: string;
   name: string;
@@ -131,8 +234,16 @@ export interface ProductItem {
   reorderLevel?: number;
   isAvailable: boolean;
   isInventory: boolean; // true = Tracked physical stock / goods, false = Non-inventory (service, labor, uncounted, fee)
+  itemType?: 'inventory' | 'non_inventory';
   businessModes: BusinessMode[];
   description?: string;
+  // Chemist / Pharmacy specific fields
+  brand?: string;
+  unit?: string; // e.g. 'Tablets', 'Capsules', 'Syrups', 'Bottles', 'Tubes', 'Boxes', 'Vials', 'Units'
+  batchNumber?: string;
+  expiryDate?: string;
+  supplierId?: string;
+  batches?: ProductBatch[];
   modifiers?: {
     name: string;
     options: { label: string; extraPrice: number }[];
