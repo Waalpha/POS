@@ -1,5 +1,22 @@
 {
   "entities": {
+    "auditLogs": {
+      "schema": {
+        "id": "string",
+        "businessId": "string",
+        "tenantId": "string",
+        "userId": "string",
+        "userName": "string",
+        "action": "string",
+        "details": "string",
+        "recordAffected": "string",
+        "timestamp": "string"
+      },
+      "permissions": {
+        "read": "true",
+        "write": "true"
+      }
+    },
     "transactions": {
       "schema": {
         "transactionId": "string",
@@ -16,8 +33,8 @@
         "deviceId": "string"
       },
       "permissions": {
-        "read": "request.auth != null",
-        "write": "request.auth != null"
+        "read": "true",
+        "write": "true"
       }
     },
     "products": {
@@ -31,7 +48,34 @@
       },
       "permissions": {
         "read": "true",
-        "write": "request.auth != null"
+        "write": "true"
+      }
+    },
+    "orders": {
+      "schema": {
+        "id": "string",
+        "tenantId": "string",
+        "orderNumber": "string",
+        "items": "array",
+        "total": "number",
+        "status": "string",
+        "timestamp": "string"
+      },
+      "permissions": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "devices": {
+      "schema": {
+        "id": "string",
+        "deviceName": "string",
+        "lastActive": "string",
+        "userAgent": "string"
+      },
+      "permissions": {
+        "read": "true",
+        "write": "true"
       }
     },
     "shifts": {
@@ -43,8 +87,8 @@
         "totalSales": "number"
       },
       "permissions": {
-        "read": "request.auth != null",
-        "write": "request.auth != null"
+        "read": "true",
+        "write": "true"
       }
     }
   },
