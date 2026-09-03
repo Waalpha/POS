@@ -17,17 +17,33 @@ import {
   AlertTriangle,
   FileText,
   RefreshCw,
+  X,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { BusinessTenant, BusinessMode, generateSlug } from '../types/pos';
 import { soundFx } from '../utils/audio';
+import { ConfirmationModal } from './ConfirmationModal';
 
 export const SuperAdminView: React.FC = () => {
-  const { businesses, setBusinesses, switchBusiness, currentBusiness, logAuditAction, auditLogs, persistTenantToFirestore, deleteTenantFromFirestore } = usePOS();
+  const {
+    businesses,
+    setBusinesses,
+    switchBusiness,
+    currentBusiness,
+    logAuditAction,
+    auditLogs,
+    persistTenantToFirestore,
+    deleteTenant,
+  } = usePOS();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewTenantModal, setShowNewTenantModal] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'tenants' | 'audit' | 'subscriptions'>('tenants');
+
+  // Tenant deletion state
+  const [tenantToDelete, setTenantToDelete] = useState<BusinessTenant | null>(null);
+  const [isDeletingTenant, setIsDeletingTenant] = useState(false);
+  const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Edit tenant form state
   const [editingTenant, setEditingTenant] = useState<BusinessTenant | null>(null);
@@ -246,6 +262,24 @@ export const SuperAdminView: React.FC = () => {
       <div className="flex-1 p-6 overflow-y-auto">
         {selectedTab === 'tenants' && (
           <div className="space-y-6">
+            {actionNotice && (
+              <div
+                className={`p-4 rounded-2xl border text-xs font-bold flex items-center justify-between animate-in fade-in ${
+                  actionNotice.type === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                }`}
+              >
+                <span>{actionNotice.message}</span>
+                <button
+                  onClick={() => setActionNotice(null)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="relative w-full sm:w-80">
                 <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
@@ -362,17 +396,11 @@ export const SuperAdminView: React.FC = () => {
                     <button
                       onClick={() => {
                         soundFx.playClick();
-                        if (confirm(`Are you sure you want to delete tenant "${biz.name}"? This action cannot be undone.`)) {
-                          deleteTenantFromFirestore(biz.id).catch(() => {});
-                          const updated = businesses.filter((b) => b.id !== biz.id);
-                          localStorage.setItem('davetech_businesses', JSON.stringify(updated));
-                          setBusinesses(updated);
-                          logAuditAction('TENANT_DELETED', `Super Admin deleted tenant: ${biz.name}`, biz.id);
-                          soundFx.playSuccess();
-                        }
+                        setTenantToDelete(biz);
                       }}
                       className="py-2 px-2.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-rose-500/30 cursor-pointer"
                       title="Delete Tenant"
+                      id={`btn-delete-tenant-${biz.id}`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -718,6 +746,54 @@ export const SuperAdminView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal for Tenant Deletion */}
+      <ConfirmationModal
+        isOpen={!!tenantToDelete}
+        title="Delete Business Tenant"
+        message={`Are you sure you want to permanently delete "${tenantToDelete?.name}"?`}
+        confirmLabel="Yes, Delete Tenant"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={isDeletingTenant}
+        details={
+          tenantToDelete && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Tenant ID:</span>
+                <span className="font-mono text-emerald-400 font-bold">{tenantToDelete.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Operating Mode:</span>
+                <span className="capitalize font-semibold text-white">{tenantToDelete.mode}</span>
+              </div>
+              <div className="text-[11px] text-rose-300/90 pt-1.5 border-t border-slate-800 mt-2">
+                ⚠️ This will permanently remove the tenant from Firestore database, wipe cached products, table layouts, and offline state.
+              </div>
+            </div>
+          )
+        }
+        onConfirm={async () => {
+          if (!tenantToDelete) return;
+          setIsDeletingTenant(true);
+          const res = await deleteTenant(tenantToDelete.id);
+          setIsDeletingTenant(false);
+          if (res.success) {
+            soundFx.playSuccess();
+            setActionNotice({ type: 'success', message: res.message || `Tenant "${tenantToDelete.name}" deleted.` });
+            setTimeout(() => setActionNotice(null), 5000);
+            setTenantToDelete(null);
+          } else {
+            soundFx.playError();
+            setActionNotice({ type: 'error', message: res.message || 'Failed to delete tenant.' });
+          }
+        }}
+        onCancel={() => {
+          if (!isDeletingTenant) {
+            setTenantToDelete(null);
+          }
+        }}
+      />
     </div>
   );
 };

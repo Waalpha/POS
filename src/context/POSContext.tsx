@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { db, auth } from '../lib/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import {
   BusinessTenant,
@@ -330,6 +330,7 @@ interface POSContextType {
   // Firestore Persistence & Source of Truth Actions
   persistTenantToFirestore: (tenant: BusinessTenant) => Promise<void>;
   deleteTenantFromFirestore: (tenantId: string) => Promise<void>;
+  deleteTenant: (tenantId: string) => Promise<{ success: boolean; message?: string }>;
   persistProductToFirestore: (product: ProductItem) => Promise<void>;
   deleteProductFromFirestore: (productId: string) => Promise<void>;
   persistOrderToFirestore: (order: OrderRecord) => Promise<void>;
@@ -517,6 +518,67 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       handleFirestoreError(error, OperationType.DELETE, `tenants/${tenantId}`);
     }
   }, []);
+
+  const deleteTenant = useCallback(async (tenantId: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const target = businesses.find((b) => b.id === tenantId);
+      const targetName = target?.name || tenantId;
+
+      // 1. Delete from Firestore tenants collection
+      await deleteDoc(doc(db, 'tenants', tenantId));
+
+      // 2. Clean up any products associated with this tenant in Firestore
+      try {
+        const prodQuery = query(collection(db, 'products'), where('tenantId', '==', tenantId));
+        const prodSnap = await getDocs(prodQuery);
+        const deletePromises = prodSnap.docs.map((d) => deleteDoc(d.ref));
+        await Promise.all(deletePromises);
+      } catch (e) {
+        console.warn('Non-fatal: could not batch clean tenant products in Firestore', e);
+      }
+
+      // 3. Update in-memory businesses state
+      const updated = businesses.filter((b) => b.id !== tenantId);
+      const finalBusinesses = updated.length > 0 ? updated : INITIAL_BUSINESSES;
+      setBusinesses(finalBusinesses);
+      localStorage.setItem('davetech_businesses', JSON.stringify(finalBusinesses));
+
+      // 4. If currentBusinessId is the deleted tenant, safely switch to the next available business
+      if (currentBusinessId === tenantId) {
+        const nextBiz = finalBusinesses[0];
+        setCurrentBusinessId(nextBiz.id);
+        localStorage.setItem('davetech_current_biz_id', nextBiz.id);
+      }
+
+      // 5. Clean up local storage items for this tenant
+      try {
+        localStorage.removeItem(`davetech_products_${tenantId}`);
+        localStorage.removeItem(`davetech_cleared_products_${tenantId}`);
+        localStorage.removeItem(`davetech_tables_${tenantId}`);
+        localStorage.removeItem(`davetech_cashiers_${tenantId}`);
+        localStorage.removeItem(`davetech_shifts_${tenantId}`);
+      } catch (e) {
+        console.warn('Non-fatal: localStorage cleanup issue', e);
+      }
+
+      // 6. Clean up IndexedDB offline database for this tenant
+      try {
+        if (typeof indexedDB !== 'undefined' && indexedDB.deleteDatabase) {
+          indexedDB.deleteDatabase(`davetech_pos_tenant_${tenantId}`);
+        }
+      } catch (e) {
+        console.warn('Non-fatal: IndexedDB database delete issue', e);
+      }
+
+      // 7. Log audit trail
+      logAuditAction('TENANT_DELETED', `Tenant workspace "${targetName}" (${tenantId}) permanently deleted`, tenantId);
+
+      return { success: true, message: `Tenant "${targetName}" deleted successfully.` };
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `tenants/${tenantId}`);
+      return { success: false, message: 'Failed to delete tenant. Please check permissions.' };
+    }
+  }, [businesses, currentBusinessId, logAuditAction]);
 
   const persistProductToFirestore = useCallback(async (product: ProductItem) => {
     try {
@@ -1202,6 +1264,56 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('davetech_businesses', JSON.stringify(businesses));
   }, [businesses]);
+
+  // Real-time Firestore tenants synchronization
+  useEffect(() => {
+    try {
+      const q = query(collection(db, 'tenants'));
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreTenants: BusinessTenant[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as BusinessTenant;
+              if (data && (data.id || docSnap.id) && data.name) {
+                firestoreTenants.push({ ...data, id: data.id || docSnap.id });
+              }
+            });
+
+            setBusinesses((prev) => {
+              const fsMap = new Map(firestoreTenants.map((t) => [t.id, t]));
+              // If a dynamic tenant (tenant-*) was deleted from Firestore, remove it
+              const updated = prev
+                .filter((b) => {
+                  if (b.id.startsWith('tenant-')) {
+                    return fsMap.has(b.id);
+                  }
+                  return true;
+                })
+                .map((b) => (fsMap.has(b.id) ? { ...b, ...fsMap.get(b.id)! } : b));
+
+              // Add any new tenants from Firestore
+              for (const [id, ft] of fsMap.entries()) {
+                if (!updated.some((b) => b.id === id)) {
+                  updated.push(ft);
+                }
+              }
+
+              localStorage.setItem('davetech_businesses', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        },
+        (err) => {
+          console.warn('Tenants subscription fallback to localStorage:', err);
+        }
+      );
+      return () => unsub();
+    } catch (e) {
+      console.warn('Could not establish tenants snapshot:', e);
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('davetech_current_biz_id', currentBusinessId);
@@ -3086,6 +3198,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         triggerDaraja3StkPush,
         persistTenantToFirestore,
         deleteTenantFromFirestore,
+        deleteTenant,
         persistProductToFirestore,
         deleteProductFromFirestore,
         persistOrderToFirestore,

@@ -13,6 +13,7 @@ import {
   Activity,
   UserCheck,
   ArrowLeft,
+  Trash2,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { BusinessTenant } from '../types/pos';
@@ -20,11 +21,13 @@ import { soundFx } from '../utils/audio';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
 import { SuperAdminView } from './SuperAdminView';
+import { ConfirmationModal } from './ConfirmationModal';
 
 export const PlatformGateway: React.FC = () => {
   const {
     businesses,
     openTenantPOS,
+    deleteTenant,
     isTenantLoading,
     loadingTenantName,
     accessDenied,
@@ -39,6 +42,8 @@ export const PlatformGateway: React.FC = () => {
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('breakthroughcollege03@gmail.com');
   const [currentUserRole, setCurrentUserRole] = useState<'super_admin' | 'manager' | 'cashier'>('super_admin');
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
+  const [tenantToDelete, setTenantToDelete] = useState<BusinessTenant | null>(null);
+  const [isDeletingTenant, setIsDeletingTenant] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -238,9 +243,25 @@ export const PlatformGateway: React.FC = () => {
                       <h4 className="text-base font-bold text-white mt-1">{biz.name}</h4>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    Active
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      Active
+                    </span>
+                    {(currentUserRole === 'super_admin' || currentUserEmail === 'breakthroughcollege03@gmail.com') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          soundFx.playClick();
+                          setTenantToDelete(biz);
+                        }}
+                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors border border-transparent hover:border-rose-500/30 cursor-pointer"
+                        title={`Delete workspace "${biz.name}"`}
+                        id={`gateway-delete-tenant-${biz.id}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <p className="text-xs text-slate-400 mb-5 line-clamp-2">{biz.tagline}</p>
@@ -284,6 +305,52 @@ export const PlatformGateway: React.FC = () => {
           </>
         )}
       </main>
+
+      {/* Confirmation Modal for Tenant Deletion */}
+      <ConfirmationModal
+        isOpen={!!tenantToDelete}
+        title="Delete Business Workspace"
+        message={`Are you sure you want to permanently delete "${tenantToDelete?.name}"?`}
+        confirmLabel="Yes, Delete Tenant"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={isDeletingTenant}
+        details={
+          tenantToDelete && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Tenant ID:</span>
+                <span className="font-mono text-emerald-400 font-bold">{tenantToDelete.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Operating Mode:</span>
+                <span className="capitalize font-semibold text-white">{tenantToDelete.mode}</span>
+              </div>
+              <div className="text-[11px] text-rose-300/90 pt-1.5 border-t border-slate-800 mt-2">
+                ⚠️ All associated products, cashiers, offline queues, and Firestore cloud records for this tenant will be erased.
+              </div>
+            </div>
+          )
+        }
+        onConfirm={async () => {
+          if (!tenantToDelete) return;
+          setIsDeletingTenant(true);
+          const res = await deleteTenant(tenantToDelete.id);
+          setIsDeletingTenant(false);
+          if (res.success) {
+            soundFx.playSuccess();
+            setTenantToDelete(null);
+          } else {
+            soundFx.playError();
+            alert(res.message || 'Failed to delete tenant.');
+          }
+        }}
+        onCancel={() => {
+          if (!isDeletingTenant) {
+            setTenantToDelete(null);
+          }
+        }}
+      />
     </div>
   );
 };
