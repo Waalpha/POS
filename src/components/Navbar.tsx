@@ -605,30 +605,26 @@ export const Navbar: React.FC = () => {
           >
             <div className="relative flex items-center">
               {!isOnline ? (
-                <WifiOff className="w-4 h-4 text-amber-700 shrink-0" />
+                <span className="text-sm leading-none mr-0.5">🟠</span>
               ) : syncProgress.syncState === 'syncing' ? (
-                <CloudUpload className="w-4 h-4 text-blue-700 animate-spin shrink-0" />
-              ) : syncProgress.syncState === 'synced' && syncProgress.syncedCount > 0 ? (
-                <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                <CloudUpload className="w-4 h-4 text-blue-700 animate-spin shrink-0 mr-0.5" />
               ) : (
-                <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-300 shrink-0 inline-block"></span>
+                <span className="text-sm leading-none mr-0.5">🟢</span>
               )}
               {pendingOfflineSyncCount > 0 && !isOnline && (
-                <span className="ml-1 px-1 py-0.2 bg-amber-500 text-slate-950 font-black text-[9px] rounded-full">
+                <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-slate-950 font-black text-[9px] rounded-full">
                   {pendingOfflineSyncCount}
                 </span>
               )}
             </div>
-            <span className="text-[10px] uppercase tracking-wide">
+            <span className="text-[11px] font-bold tracking-tight">
               {!isOnline
                 ? pendingOfflineSyncCount > 0
-                  ? `OFFLINE (${pendingOfflineSyncCount} SAVED)`
-                  : 'OFFLINE (SAVED LOCALLY)'
+                  ? `Offline (${pendingOfflineSyncCount} pending)`
+                  : 'Offline — Sales will sync when connection returns'
                 : syncProgress.syncState === 'syncing'
-                ? `SYNCING ${pendingOfflineSyncCount} SALES...`
-                : syncProgress.syncState === 'synced' && syncProgress.syncedCount > 0
-                ? `${syncProgress.syncedCount} SALES SYNCHRONIZED`
-                : 'ONLINE'}
+                ? `Syncing (${pendingOfflineSyncCount})...`
+                : 'Online — Synced'}
             </span>
           </button>
 

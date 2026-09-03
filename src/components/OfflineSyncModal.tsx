@@ -56,7 +56,7 @@ export const OfflineSyncModal: React.FC<{
 
   const loadData = async () => {
     try {
-      const txs = await getAllOfflineTransactions();
+      const txs = await getAllOfflineTransactions(currentBusinessId);
       setDbTransactions(txs);
     } catch {
       setDbTransactions([]);
@@ -67,7 +67,7 @@ export const OfflineSyncModal: React.FC<{
     if (isOpen) {
       loadData();
     }
-  }, [isOpen, pendingOfflineSyncCount, syncProgress]);
+  }, [isOpen, pendingOfflineSyncCount, syncProgress, currentBusinessId]);
 
   if (!isOpen) return null;
 

@@ -109,6 +109,19 @@ export interface CashierUser {
   activeShiftId?: string;
   lastLogin?: string;
   assignedPosId?: string;
+  pinHash?: string; // SHA-256 hashed PIN with tenant salt for secure offline verification
+  isAuthorizedOffline?: boolean;
+}
+
+export interface PosDeviceRecord {
+  deviceId: string;
+  tenantId: string;
+  deviceName: string;
+  registeredAt: string;
+  lastSyncAt: string;
+  status: 'active' | 'synced' | 'pending' | 'inactive';
+  userAgent?: string;
+  ipAddress?: string;
 }
 
 export type POSViewType =

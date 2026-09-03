@@ -53,11 +53,11 @@ export const OfflineStatusBanner: React.FC<{ onOpenModal?: () => void }> = ({ on
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
           <span className="font-extrabold flex items-center gap-1.5">
-            {!isOnline ? 'Internet Outage Mode Active' : 'Pending Background Sync'}
+            {!isOnline ? '🟠 Offline' : 'Pending Background Sync'}
           </span>
-          <span className={`text-[11px] ${!isOnline ? 'text-slate-900/90 font-medium' : 'text-indigo-100'}`}>
+          <span className={`text-[11px] ${!isOnline ? 'text-slate-900 font-semibold' : 'text-indigo-100'}`}>
             {!isOnline
-              ? 'Service Worker cache is running offline. All products, orders & Wi-Fi printing work 100% locally.'
+              ? "You're offline. Sales will continue and synchronize automatically when connection returns."
               : `${pendingOfflineSyncCount} transaction(s) queued for synchronization.`}
           </span>
         </div>

@@ -52,9 +52,13 @@ import { syncCoreDataToServiceWorker } from '../utils/serviceWorkerRegistration'
 import { offlineSyncManager, SyncProgressUpdate } from '../utils/offlineSyncManager';
 import {
   cacheProductsToDb,
+  getCachedProductsFromDb,
+  clearTenantOfflineProducts,
   cacheCategoriesToDb,
   cacheCashiersToDb,
   cacheConfigToDb,
+  cacheTablesToDb,
+  verifyCashierPinOffline,
   saveShiftToDb,
   getAllOfflineTransactions,
   OfflineTransactionRecord,
@@ -1109,47 +1113,71 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   }, [currentCashier, isManager]);
 
-  // Load products for current tenant from Firestore
+  // Load products for current tenant from Firestore / IndexedDB local offline database
   const loadTenantProductsFromFirestore = useCallback(async (tenantId: string) => {
     if (!tenantId) return;
     try {
       setIsProductsLoading(true);
       const isCleared = localStorage.getItem(`davetech_cleared_products_${tenantId}`) === 'true';
 
-      const q = query(collection(db, 'products'), where('tenantId', '==', tenantId));
-      const snap = await getDocs(q);
-
-      if (!snap.empty) {
-        const items: ProductItem[] = snap.docs.map((docSnap) => ({
-          ...docSnap.data(),
-          id: docSnap.id,
-          tenantId,
-          businessId: tenantId,
-        } as ProductItem));
-        setProducts(items);
-        localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(items));
-      } else if (isCleared) {
-        // Tenant specifically cleared their products: Do NOT reseed!
+      if (isCleared) {
         setProducts([]);
-        localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify([]));
-      } else {
-        // Initial brand new tenant that has not been cleared yet and not yet in Firestore:
-        const initial = INITIAL_PRODUCTS.map((p) => ({
-          ...p,
-          id: `${tenantId}-${p.id}`,
-          tenantId,
-          businessId: tenantId,
-        }));
-        setProducts(initial);
-        localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(initial));
+        setIsProductsLoading(false);
+        return;
+      }
 
-        // Seed to Firestore once
-        Promise.all(
-          initial.map((prod) => setDoc(doc(db, 'products', prod.id), prod, { merge: true }))
-        ).catch(() => {});
+      // 1. Immediately attempt reading tenant's IndexedDB offline partition for instant responsiveness
+      try {
+        const localCached = await getCachedProductsFromDb(tenantId);
+        if (localCached && localCached.length > 0) {
+          setProducts(localCached);
+        }
+      } catch {}
+
+      // 2. If online, fetch confirmed state from Firestore
+      if (offlineSyncManager.isEffectiveOnline()) {
+        const q = query(collection(db, 'products'), where('tenantId', '==', tenantId));
+        const snap = await getDocs(q);
+
+        if (!snap.empty) {
+          const items: ProductItem[] = snap.docs.map((docSnap) => ({
+            ...docSnap.data(),
+            id: docSnap.id,
+            tenantId,
+            businessId: tenantId,
+          } as ProductItem));
+          setProducts(items);
+          localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(items));
+          await cacheProductsToDb(items, tenantId);
+        } else if (isCleared) {
+          setProducts([]);
+          await cacheProductsToDb([], tenantId);
+        } else {
+          // Brand new tenant with initial mock products
+          const initial = INITIAL_PRODUCTS.map((p) => ({
+            ...p,
+            id: `${tenantId}-${p.id}`,
+            tenantId,
+            businessId: tenantId,
+          }));
+          setProducts(initial);
+          localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(initial));
+          await cacheProductsToDb(initial, tenantId);
+
+          // Seed to Firestore once
+          Promise.all(
+            initial.map((prod) => setDoc(doc(db, 'products', prod.id), prod, { merge: true }))
+          ).catch(() => {});
+        }
       }
     } catch (err) {
-      console.warn('[Firestore] Query products error:', err);
+      console.warn('[Firestore] Query products error (running offline IndexedDB):', err);
+      try {
+        const localCached = await getCachedProductsFromDb(tenantId);
+        if (localCached && localCached.length > 0) {
+          setProducts(localCached);
+        }
+      } catch {}
     } finally {
       setIsProductsLoading(false);
     }
@@ -1219,10 +1247,10 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const refreshOfflineTransactions = useCallback(async () => {
     try {
-      const records = await getAllOfflineTransactions();
+      const records = await getAllOfflineTransactions(currentBusinessId);
       setOfflineTransactions(records);
     } catch {}
-  }, []);
+  }, [currentBusinessId]);
 
   // Subscribe to network status & sync queue changes
   useEffect(() => {
@@ -1249,22 +1277,25 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return unsubscribe;
   }, [refreshOfflineTransactions]);
 
-  // Proactively cache core POS data to IndexedDB & Service Worker
+  // Proactively cache core POS data to IndexedDB & Service Worker for active tenant
   useEffect(() => {
-    cacheProductsToDb(products);
-    cacheCategoriesToDb(categories);
-    cacheCashiersToDb(cashiers);
-    cacheConfigToDb('current_business', currentBusiness);
+    if (currentBusinessId) {
+      if (products.length > 0) cacheProductsToDb(products, currentBusinessId).catch(() => {});
+      if (categories.length > 0) cacheCategoriesToDb(categories, currentBusinessId).catch(() => {});
+      if (cashiers.length > 0) cacheCashiersToDb(cashiers, currentBusinessId).catch(() => {});
+      if (tables.length > 0) cacheTablesToDb(tables, currentBusinessId).catch(() => {});
+      cacheConfigToDb('current_business', currentBusiness, currentBusinessId).catch(() => {});
 
-    syncCoreDataToServiceWorker({
-      businesses,
-      currentBusinessId,
-      products,
-      categories: CATEGORIES,
-      tables,
-      cashiers,
-      lastUpdated: new Date().toISOString(),
-    });
+      syncCoreDataToServiceWorker({
+        businesses,
+        currentBusinessId,
+        products,
+        categories: CATEGORIES,
+        tables,
+        cashiers,
+        lastUpdated: new Date().toISOString(),
+      });
+    }
   }, [businesses, currentBusiness, currentBusinessId, products, categories, tables, cashiers]);
 
   // Manual Trigger for sync
@@ -1337,14 +1368,29 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
-  // Business Switch & Update
+  // Business Switch & Update (Tenant Isolation)
   const switchBusiness = (bizId: string) => {
     soundFx.playClick();
     const found = businesses.find((b) => b.id === bizId);
     if (found) {
-      setCurrentBusinessId(bizId);
+      // 1. Clear active tenant in-memory state
       clearCart();
+      setActiveCheckoutTarget(null);
+      setSelectedTable(null);
+      setSelectedRoom(null);
+      setActiveUnpaidOrders([]);
+      setKdsTickets([]);
+
+      // 2. Switch offline sync tenant partition
+      offlineSyncManager.setTenantId(bizId);
+
+      // 3. Switch business ID & view
+      setCurrentBusinessId(bizId);
       setCurrentViewState('pos');
+
+      // 4. Refresh tenant's offline transactions
+      refreshOfflineTransactions();
+
       logAuditAction('TENANT_LOGIN', `Logged in / switched to tenant workspace: ${found.name} (${found.id})`, bizId);
     }
   };
@@ -1421,7 +1467,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction('CASHIER_PIN_RESET', `Reset PIN for cashier ID ${userId}`, userId);
   };
 
-  // Cashier Auth & Shifts
+  // Cashier Auth & Shifts (Online & Offline Verified)
   const loginWithPin = (pin: string): boolean => {
     const user = cashiers.find((c) => c.pin === pin);
     if (user) {
@@ -1437,6 +1483,24 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return true;
     }
+
+    // Secure offline verification via SHA-256 hashed PIN against tenant's IndexedDB cache
+    verifyCashierPinOffline(pin, currentBusinessId)
+      .then((offlineUser) => {
+        if (offlineUser) {
+          setCurrentCashier({ ...offlineUser, isAuthorizedOffline: true });
+          soundFx.playSuccess();
+          setShowCashierPinModal(false);
+          if (offlineUser.role === 'cashier') {
+            const managerViews: POSViewType[] = ['dashboard', 'products', 'inventory', 'reports', 'users', 'settings'];
+            if (managerViews.includes(currentView)) {
+              setCurrentViewState('pos');
+            }
+          }
+        }
+      })
+      .catch(() => {});
+
     soundFx.playError();
     return false;
   };
@@ -1625,9 +1689,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 4. Update tenant in businesses state
       updateBusiness({ demoProductsRemoved: true });
 
-      // 5. Update local storage so refresh/restart never resurrects items
+      // 5. Update local storage & IndexedDB so refresh/restart never resurrects items
       localStorage.setItem(`davetech_cleared_products_${targetTenantId}`, 'true');
       localStorage.setItem(`davetech_products_${targetTenantId}`, JSON.stringify([]));
+      await clearTenantOfflineProducts(targetTenantId);
+      await cacheProductsToDb([], targetTenantId);
 
       // 6. Reset React state to empty array
       setProducts([]);
@@ -2552,8 +2618,8 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             offlineSalesTotal: (prev.offlineSalesTotal || 0) + (isCurrentTxOffline ? amt : 0),
           };
 
-          // Save shift state to IndexedDB
-          saveShiftToDb(updatedShift);
+          // Save shift state to IndexedDB with tenant partition
+          saveShiftToDb(updatedShift, currentBusinessId);
           return updatedShift;
         });
       }
@@ -2619,6 +2685,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Persist transaction record directly to IndexedDB & sync queue
       offlineSyncManager.recordOfflineSale({
         transactionId: offlineTxId,
+        tenantId: currentBusinessId,
         orderId: newOrder.id,
         orderNumber: newOrder.orderNumber,
         businessId: newOrder.businessId,
