@@ -14,12 +14,14 @@ service cloud.firestore {
     }
 
     function getUserTenantId() {
-      return get(/databases/$(database)/documents/tenantUsers/$(request.auth.uid)).data.tenantId;
+      return exists(/databases/$(database)/documents/tenantUsers/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/tenantUsers/$(request.auth.uid)).data.tenantId
+        : '';
     }
 
     match /tenants/{tenantId} {
       allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || (isSignedIn() && getUserTenantId() == tenantId);
+      allow write: if isSuperAdmin() || (isSignedIn() && (getUserTenantId() == tenantId || getUserTenantId() == ''));
     }
 
     match /tenantUsers/{userId} {
@@ -32,7 +34,15 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
-      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (
+        isSuperAdmin() ||
+        (request.resource.data.tenantId != null && (request.resource.data.tenantId == getUserTenantId() || getUserTenantId() == '' || isSuperAdmin()))
+      );
+      allow delete: if isSignedIn() && (
+        isSuperAdmin() ||
+        (resource != null && (resource.data.tenantId == getUserTenantId() || getUserTenantId() == '' || isSuperAdmin()))
+      );
     }
 
     match /sales/{saleId} {
@@ -64,7 +74,9 @@ service cloud.firestore {
     }
 
     match /auditLogs/{logId} {
-      allow read, write: if isSignedIn() && (isSuperAdmin() || resource.data.tenantId == getUserTenantId() || request.resource.data.tenantId == getUserTenantId());
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSuperAdmin();
     }
 
     match /purchases/{purchaseId} {

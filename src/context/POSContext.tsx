@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { db, auth } from '../lib/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import {
   BusinessTenant,
@@ -157,6 +157,11 @@ interface POSContextType {
   setEditingProduct: (product: ProductItem | null) => void;
   isManageItemsMode: boolean;
   setIsManageItemsMode: (enabled: boolean | ((prev: boolean) => boolean)) => void;
+  canManageProducts: boolean;
+  isProductsLoading: boolean;
+  isClearingProducts: boolean;
+  clearAllTenantProducts: () => Promise<{ success: boolean; count: number; error?: string }>;
+  importProducts: (newProducts: Omit<ProductItem, 'id'>[]) => Promise<{ count: number; error?: string }>;
 
   // Cart & Active Order
   cart: CartItem[];
@@ -648,17 +653,44 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [categories] = useState<ProductCategory[]>(CATEGORIES);
-  const [products, setProducts] = useState<ProductItem[]>(() => {
-    const saved = localStorage.getItem('davetech_products');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return INITIAL_PRODUCTS;
+
+  // Helper to load cached or demo products scoped strictly to tenant
+  const getInitialTenantProducts = (tenantId: string): ProductItem[] => {
+    const isCleared = localStorage.getItem(`davetech_cleared_products_${tenantId}`) === 'true';
+    if (isCleared) {
+      const stored = localStorage.getItem(`davetech_products_${tenantId}`);
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch {
+          return [];
+        }
       }
+      return [];
     }
-    return INITIAL_PRODUCTS;
+
+    const tenantStored = localStorage.getItem(`davetech_products_${tenantId}`);
+    if (tenantStored) {
+      try {
+        const parsed = JSON.parse(tenantStored);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+
+    // Default mock items scoped to tenant
+    return INITIAL_PRODUCTS.map((p) => ({
+      ...p,
+      id: `${tenantId}-${p.id}`,
+      tenantId,
+      businessId: tenantId,
+    }));
+  };
+
+  const [products, setProducts] = useState<ProductItem[]>(() => {
+    return getInitialTenantProducts(currentBusinessId);
   });
+  const [isProductsLoading, setIsProductsLoading] = useState<boolean>(false);
+  const [isClearingProducts, setIsClearingProducts] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('cat-food');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'inventory' | 'non_inventory'>('all');
@@ -1070,6 +1102,66 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isManager = useMemo(() => currentCashier?.role === 'manager', [currentCashier]);
   const isCashier = useMemo(() => currentCashier?.role === 'cashier', [currentCashier]);
 
+  const canManageProducts = useMemo(() => {
+    if (currentCashier?.role === 'manager') return true;
+    if (isManager) return true;
+    if (auth.currentUser?.email === 'breakthroughcollege03@gmail.com') return true;
+    return false;
+  }, [currentCashier, isManager]);
+
+  // Load products for current tenant from Firestore
+  const loadTenantProductsFromFirestore = useCallback(async (tenantId: string) => {
+    if (!tenantId) return;
+    try {
+      setIsProductsLoading(true);
+      const isCleared = localStorage.getItem(`davetech_cleared_products_${tenantId}`) === 'true';
+
+      const q = query(collection(db, 'products'), where('tenantId', '==', tenantId));
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        const items: ProductItem[] = snap.docs.map((docSnap) => ({
+          ...docSnap.data(),
+          id: docSnap.id,
+          tenantId,
+          businessId: tenantId,
+        } as ProductItem));
+        setProducts(items);
+        localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(items));
+      } else if (isCleared) {
+        // Tenant specifically cleared their products: Do NOT reseed!
+        setProducts([]);
+        localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify([]));
+      } else {
+        // Initial brand new tenant that has not been cleared yet and not yet in Firestore:
+        const initial = INITIAL_PRODUCTS.map((p) => ({
+          ...p,
+          id: `${tenantId}-${p.id}`,
+          tenantId,
+          businessId: tenantId,
+        }));
+        setProducts(initial);
+        localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(initial));
+
+        // Seed to Firestore once
+        Promise.all(
+          initial.map((prod) => setDoc(doc(db, 'products', prod.id), prod, { merge: true }))
+        ).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[Firestore] Query products error:', err);
+    } finally {
+      setIsProductsLoading(false);
+    }
+  }, []);
+
+  // When business changes, reload tenant products
+  useEffect(() => {
+    const cached = getInitialTenantProducts(currentBusinessId);
+    setProducts(cached);
+    loadTenantProductsFromFirestore(currentBusinessId);
+  }, [currentBusinessId, loadTenantProductsFromFirestore]);
+
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(true);
   const [isHighContrast, setIsHighContrast] = useState<boolean>(false);
 
@@ -1092,8 +1184,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [cashiers]);
 
   useEffect(() => {
-    localStorage.setItem('davetech_products', JSON.stringify(products));
-  }, [products]);
+    if (currentBusinessId) {
+      localStorage.setItem(`davetech_products_${currentBusinessId}`, JSON.stringify(products));
+      localStorage.setItem('davetech_products', JSON.stringify(products));
+    }
+  }, [products, currentBusinessId]);
 
   useEffect(() => {
     localStorage.setItem('davetech_orders', JSON.stringify(orderHistory));
@@ -1463,14 +1558,19 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     soundFx.playSuccess();
     const newProd: ProductItem = {
       ...product,
-      id: `prod-custom-${Date.now()}`,
+      id: `prod-${currentBusinessId}-${Date.now()}`,
+      tenantId: currentBusinessId,
+      businessId: currentBusinessId,
     };
     setProducts((prev) => [newProd, ...prev]);
+    localStorage.removeItem(`davetech_cleared_products_${currentBusinessId}`);
+
     if (db) {
       setDoc(doc(db, 'products', newProd.id), newProd, { merge: true }).catch((err) =>
         console.warn('[Firestore] Product add sync:', err)
       );
     }
+    logAuditAction('PRODUCT_ADDED', `Added product "${newProd.name}" (${newProd.price} KSh)`, newProd.id);
   };
 
   const deleteProduct = (productId: string) => {
@@ -1480,6 +1580,151 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteDoc(doc(db, 'products', productId)).catch((err) =>
         console.warn('[Firestore] Product delete sync:', err)
       );
+    }
+    logAuditAction('PRODUCT_DELETED', `Deleted product ID ${productId}`, productId);
+  };
+
+  // Clear All Items for Current Tenant with Strict Isolation and Firestore Deletion
+  const clearAllTenantProducts = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+    if (!canManageProducts) {
+      return {
+        success: false,
+        count: 0,
+        error: 'Permission denied. Only Super Admin, Tenant Admin, or Manager can clear products.',
+      };
+    }
+
+    setIsClearingProducts(true);
+    try {
+      soundFx.playClick();
+      const targetTenantId = currentBusinessId;
+
+      // 1. Fetch all Firestore products for this tenant ONLY
+      const q = query(collection(db, 'products'), where('tenantId', '==', targetTenantId));
+      const snap = await getDocs(q);
+      const deleteCount = snap.docs.length;
+
+      // 2. Delete all Firestore products for this tenant
+      const deletePromises = snap.docs.map((docSnap) => deleteDoc(doc(db, 'products', docSnap.id)));
+      await Promise.all(deletePromises);
+
+      // 3. Mark in Firestore tenant document that demo products have been cleared
+      try {
+        await setDoc(
+          doc(db, 'tenants', targetTenantId),
+          {
+            demoProductsRemoved: true,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.warn('[Firestore] update tenant demoProductsRemoved:', err);
+      }
+
+      // 4. Update tenant in businesses state
+      updateBusiness({ demoProductsRemoved: true });
+
+      // 5. Update local storage so refresh/restart never resurrects items
+      localStorage.setItem(`davetech_cleared_products_${targetTenantId}`, 'true');
+      localStorage.setItem(`davetech_products_${targetTenantId}`, JSON.stringify([]));
+
+      // 6. Reset React state to empty array
+      setProducts([]);
+
+      // 7. Clear cart to prevent stale references
+      clearCart();
+
+      // 8. Record audit log
+      const actorId = auth.currentUser?.uid || currentCashier?.id || 'mgr-authorized';
+      const actorName = currentCashier?.name || auth.currentUser?.email || 'Manager/Admin';
+
+      logAuditAction(
+        'CLEAR_ALL_ITEMS',
+        `Cleared all ${deleteCount} product catalogue items for tenant ${currentBusiness.name}. Catalogue reset to clean slate.`,
+        `products:${targetTenantId}`
+      );
+
+      try {
+        await addDoc(collection(db, 'auditLogs'), {
+          action: 'CLEAR_ALL_ITEMS',
+          tenantId: targetTenantId,
+          businessName: currentBusiness.name,
+          performedBy: actorId,
+          userName: actorName,
+          userEmail: auth.currentUser?.email || currentCashier?.email || null,
+          details: `Cleared all product items (${deleteCount} items) for tenant: ${currentBusiness.name} (${targetTenantId})`,
+          timestamp: new Date().toISOString(),
+          createdAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('[Firestore] audit log record:', err);
+      }
+
+      // 9. Verify from Firestore
+      const verifySnap = await getDocs(q);
+      const verifiedProducts: ProductItem[] = verifySnap.docs.map((d) => ({
+        ...d.data(),
+        id: d.id,
+        tenantId: targetTenantId,
+      } as ProductItem));
+      setProducts(verifiedProducts);
+
+      soundFx.playSuccess();
+      return { success: true, count: deleteCount };
+    } catch (err: any) {
+      console.error('[POSContext] clearAllTenantProducts error:', err);
+      return {
+        success: false,
+        count: 0,
+        error: err?.message || 'Failed to remove products from Firestore.',
+      };
+    } finally {
+      setIsClearingProducts(false);
+    }
+  };
+
+  // Bulk Import Products to Catalogue
+  const importProducts = async (
+    newProducts: Omit<ProductItem, 'id'>[]
+  ): Promise<{ count: number; error?: string }> => {
+    try {
+      const itemsToAdd: ProductItem[] = newProducts.map((p, idx) => ({
+        ...p,
+        id: `prod-${currentBusinessId}-${Date.now()}-${idx}`,
+        tenantId: currentBusinessId,
+        businessId: currentBusinessId,
+        isAvailable: p.isAvailable ?? true,
+        businessModes: p.businessModes || [currentBusiness.mode],
+        imageUrl:
+          p.imageUrl ||
+          'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80',
+      }));
+
+      if (db) {
+        await Promise.all(
+          itemsToAdd.map((item) => setDoc(doc(db, 'products', item.id), item, { merge: true }))
+        );
+      }
+
+      setProducts((prev) => [...itemsToAdd, ...prev]);
+      localStorage.setItem(
+        `davetech_products_${currentBusinessId}`,
+        JSON.stringify([...itemsToAdd, ...products])
+      );
+      localStorage.removeItem(`davetech_cleared_products_${currentBusinessId}`);
+
+      logAuditAction(
+        'IMPORT_PRODUCTS',
+        `Imported ${itemsToAdd.length} products to catalogue.`,
+        `products:${currentBusinessId}`
+      );
+
+      soundFx.playSuccess();
+      return { count: itemsToAdd.length };
+    } catch (err: any) {
+      console.error('[POSContext] importProducts error:', err);
+      return { count: 0, error: err?.message || 'Failed to import products' };
     }
   };
 
@@ -2673,6 +2918,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setEditingProduct,
         isManageItemsMode,
         setIsManageItemsMode,
+        canManageProducts,
+        isProductsLoading,
+        isClearingProducts,
+        clearAllTenantProducts,
+        importProducts,
         cart,
         addToCart,
         updateCartItem,

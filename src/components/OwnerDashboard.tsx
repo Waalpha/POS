@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Package,
+  PackageOpen,
   Zap,
   Boxes,
   Plus,
@@ -56,6 +57,8 @@ import { BusinessMode, CashierUser, OrderRecord, ProductItem, UserRole } from '.
 import { soundFx } from '../utils/audio';
 import { Daraja3SettingsCard } from './Daraja3SettingsCard';
 import { ResetPaymentsModal } from './ResetPaymentsModal';
+import { ClearAllItemsModal } from './ClearAllItemsModal';
+import { ImportProductsModal } from './ImportProductsModal';
 
 type DashboardTabType =
   | 'overview'
@@ -93,7 +96,14 @@ export const OwnerDashboard: React.FC = () => {
     deleteCashierUser,
     printerConfig,
     setShowWifiPrinterModal,
+    canManageProducts,
+    isClearingProducts,
+    isProductsLoading,
   } = usePOS();
+
+  // Modal states for catalogue management
+  const [showClearModal, setShowClearModal] = useState<boolean>(false);
+  const [showImportModal, setShowImportModal] = useState<boolean>(false);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<DashboardTabType>('overview');
@@ -824,8 +834,29 @@ export const OwnerDashboard: React.FC = () => {
             ======================================================== */}
         {activeTab === 'products' && (
           <div className="space-y-4">
+            {/* Header Breadcrumb & Tenant Counter */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                  <span>Products</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-slate-900 font-extrabold">Manage Products</span>
+                </div>
+                <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight mt-0.5">
+                  Products & Pricing Catalogue
+                </h2>
+              </div>
+              <div className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shrink-0 shadow-2xs">
+                <Package className="w-3.5 h-3.5 text-indigo-600" />
+                <span>
+                  {products.length} {products.length === 1 ? 'Item' : 'Items'} for{' '}
+                  <span className="text-slate-900 font-black">{currentBusiness.name}</span>
+                </span>
+              </div>
+            </div>
+
             {/* Action Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
@@ -837,7 +868,7 @@ export const OwnerDashboard: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={inventoryCategoryFilter}
                   onChange={(e) => setInventoryCategoryFilter(e.target.value)}
@@ -852,106 +883,183 @@ export const OwnerDashboard: React.FC = () => {
                 </select>
 
                 <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setShowImportModal(true);
+                  }}
+                  className="px-3.5 py-2 bg-white hover:bg-slate-50 text-indigo-700 font-extrabold text-xs rounded-xl border border-indigo-200 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  id="btn-manager-import-products"
+                  title="Import products from CSV or Excel"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+                  <span>Import Products</span>
+                </button>
+
+                <button
                   onClick={handleOpenAddProduct}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                   id="btn-manager-add-product"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
                   <span>Add Product</span>
                 </button>
+
+                {/* Manager / Admin-only Clear All Items Feature */}
+                {canManageProducts && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setShowClearModal(true);
+                    }}
+                    className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl border border-rose-200 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                    id="btn-clear-all-items"
+                    title="Remove sample items and start with your own products"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                    <span>Clear All Items</span>
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Products Table */}
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
-                      <th className="py-3 px-4">Item & Code</th>
-                      <th className="py-3 px-3">Category</th>
-                      <th className="py-3 px-3">Type</th>
-                      <th className="py-3 px-3 text-right">Price ({currencySymbol})</th>
-                      <th className="py-3 px-3 text-center">Stock</th>
-                      <th className="py-3 px-4 text-right">Manager Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                    {filteredProducts.map((prod) => {
-                      const isInv = prod.isInventory !== false;
-                      const cat = categories.find((c) => c.id === prod.categoryId);
+            {/* Products Display (Empty State vs Filtered Table) */}
+            {products.length === 0 ? (
+              <div
+                className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-14 flex flex-col items-center justify-center text-center shadow-xs space-y-4"
+                id="empty-product-state"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
+                  <PackageOpen className="w-8 h-8 stroke-[1.8]" />
+                </div>
+                <div className="max-w-md space-y-1.5">
+                  <h3 className="font-black text-slate-900 text-lg">No Items Yet</h3>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed">
+                    Your product catalogue is empty. Add your own products to start selling.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={handleOpenAddProduct}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+                    id="btn-empty-add-product"
+                  >
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
+                    <span>+ Add Product</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      soundFx.playClick();
+                      setShowImportModal(true);
+                    }}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+                    id="btn-empty-import-products"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Import Products</span>
+                  </button>
+                </div>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500 space-y-2">
+                <Package className="w-10 h-10 text-slate-300 mx-auto" />
+                <p className="font-extrabold text-slate-800 text-sm">No items matching search</p>
+                <p className="text-xs text-slate-400">
+                  Try selecting a different category or clearing search keywords.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                        <th className="py-3 px-4">Item & Code</th>
+                        <th className="py-3 px-3">Category</th>
+                        <th className="py-3 px-3">Type</th>
+                        <th className="py-3 px-3 text-right">Price ({currencySymbol})</th>
+                        <th className="py-3 px-3 text-center">Stock</th>
+                        <th className="py-3 px-4 text-right">Manager Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {filteredProducts.map((prod) => {
+                        const isInv = prod.isInventory !== false;
+                        const cat = categories.find((c) => c.id === prod.categoryId);
 
-                      return (
-                        <tr key={prod.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={prod.imageUrl}
-                                alt={prod.name}
-                                referrerPolicy="no-referrer"
-                                className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0"
-                              />
-                              <div>
-                                <div className="font-extrabold text-slate-900 text-xs sm:text-sm">
-                                  {prod.name}
-                                </div>
-                                <div className="text-[11px] text-slate-400 font-mono">
-                                  SKU: {prod.sku || 'N/A'}
+                        return (
+                          <tr key={prod.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={prod.imageUrl}
+                                  alt={prod.name}
+                                  referrerPolicy="no-referrer"
+                                  className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0"
+                                />
+                                <div>
+                                  <div className="font-extrabold text-slate-900 text-xs sm:text-sm">
+                                    {prod.name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 font-mono">
+                                    SKU: {prod.sku || 'N/A'}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                              {cat?.name || prod.categoryId}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3">
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                isInv
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              }`}
-                            >
-                              {isInv ? 'Tracked Stock' : 'Service Item'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-right font-black text-slate-900 text-sm">
-                            {currencySymbol} {prod.price.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            {isInv ? (
-                              <span className="font-bold text-slate-800">{prod.stock ?? 0} units</span>
-                            ) : (
-                              <span className="text-slate-400 italic">Unlimited</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => handleOpenEditProduct(prod)}
-                                className="p-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg transition-colors cursor-pointer"
-                                title="Edit Product & Price"
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold">
+                                {cat?.name || prod.categoryId}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                  isInv
+                                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                }`}
                               >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                                className="p-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-lg transition-colors cursor-pointer"
-                                title="Delete Product"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                                {isInv ? 'Tracked Stock' : 'Service Item'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-right font-black text-slate-900 text-sm">
+                              {currencySymbol} {prod.price.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {isInv ? (
+                                <span className="font-bold text-slate-800">{prod.stock ?? 0} units</span>
+                              ) : (
+                                <span className="text-slate-400 italic">Unlimited</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEditProduct(prod)}
+                                  className="p-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg transition-colors cursor-pointer"
+                                  title="Edit Product & Price"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                                  className="p-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete Product"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -2212,6 +2320,18 @@ export const OwnerDashboard: React.FC = () => {
       <ResetPaymentsModal
         isOpen={showResetPaymentsModal}
         onClose={() => setShowResetPaymentsModal(false)}
+      />
+
+      {/* Clear All Tenant Items Confirmation Modal */}
+      <ClearAllItemsModal
+        isOpen={showClearModal}
+        onClose={() => setShowClearModal(false)}
+      />
+
+      {/* Bulk Import Products Modal */}
+      <ImportProductsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
       />
     </div>
   );

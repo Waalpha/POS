@@ -3,6 +3,7 @@ import {
   Plus,
   SlidersHorizontal,
   Package,
+  PackageOpen,
   X,
   Check,
   Edit2,
@@ -21,6 +22,8 @@ export const ProductGrid: React.FC = () => {
     currencySymbol,
     setEditingProduct,
     isManageItemsMode,
+    canManageProducts,
+    setCurrentView,
   } = usePOS();
 
   const [customizingProduct, setCustomizingProduct] = useState<ProductItem | null>(null);
@@ -98,7 +101,35 @@ export const ProductGrid: React.FC = () => {
     <div className="flex-1 flex flex-col min-h-0 select-none">
       {/* Product Grid Area */}
       <div className="flex-1 overflow-y-auto pr-1 pb-4">
-        {filteredProducts.length === 0 ? (
+        {products.length === 0 ? (
+          <div
+            className="min-h-[280px] h-full flex flex-col items-center justify-center text-center p-8 bg-white rounded-3xl border border-slate-200 text-slate-500 shadow-xs space-y-3"
+            id="pos-empty-product-catalogue"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
+              <PackageOpen className="w-7 h-7 stroke-[1.8]" />
+            </div>
+            <div className="max-w-xs space-y-1">
+              <h3 className="font-black text-slate-900 text-base">No Items Yet</h3>
+              <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                Your product catalogue is empty. Add your own products to start selling.
+              </p>
+            </div>
+            {canManageProducts && (
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('products')}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  id="btn-pos-manage-add"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>Add Product</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-white rounded-3xl border border-slate-200 text-slate-500 shadow-xs">
             <Package className="w-12 h-12 text-slate-300 mb-2" />
             <p className="font-extrabold text-slate-800 text-sm">No items found</p>

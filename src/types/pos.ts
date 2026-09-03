@@ -85,6 +85,7 @@ export interface BusinessTenant {
   domainType?: DomainType;
   verificationToken?: string;
   verifiedAt?: string;
+  demoProductsRemoved?: boolean;
 }
 
 export function generateSlug(name: string): string {
@@ -243,6 +244,8 @@ export interface ProductItem {
   batchNumber?: string;
   expiryDate?: string;
   supplierId?: string;
+  tenantId?: string;
+  businessId?: string;
   batches?: ProductBatch[];
   modifiers?: {
     name: string;
