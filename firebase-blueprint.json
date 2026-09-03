@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "transactions": {
+      "schema": {
+        "transactionId": "string",
+        "orderNumber": "string",
+        "businessId": "string",
+        "cashierId": "string",
+        "cashierName": "string",
+        "items": "array",
+        "totals": "map",
+        "paymentMethod": "string",
+        "paymentStatus": "string",
+        "createdAt": "string",
+        "syncStatus": "string",
+        "deviceId": "string"
+      },
+      "permissions": {
+        "read": "request.auth != null",
+        "write": "request.auth != null"
+      }
+    },
+    "products": {
+      "schema": {
+        "id": "string",
+        "name": "string",
+        "categoryId": "string",
+        "price": "number",
+        "stock": "number",
+        "isAvailable": "boolean"
+      },
+      "permissions": {
+        "read": "true",
+        "write": "request.auth != null"
+      }
+    },
+    "shifts": {
+      "schema": {
+        "id": "string",
+        "cashierId": "string",
+        "startTime": "string",
+        "status": "string",
+        "totalSales": "number"
+      },
+      "permissions": {
+        "read": "request.auth != null",
+        "write": "request.auth != null"
+      }
+    }
+  },
+  "firestore": {
+    "indexes": []
+  }
+}
