@@ -23,7 +23,7 @@ import { BusinessTenant, BusinessMode, generateSlug } from '../types/pos';
 import { soundFx } from '../utils/audio';
 
 export const SuperAdminView: React.FC = () => {
-  const { businesses, switchBusiness, currentBusiness, logAuditAction, auditLogs } = usePOS();
+  const { businesses, setBusinesses, switchBusiness, currentBusiness, logAuditAction, auditLogs, persistTenantToFirestore, deleteTenantFromFirestore } = usePOS();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewTenantModal, setShowNewTenantModal] = useState(false);
@@ -77,7 +77,7 @@ export const SuperAdminView: React.FC = () => {
 
     const updatedBusinesses = businesses.map((b) => {
       if (b.id === editingTenant.id) {
-        return {
+        const updatedBiz = {
           ...b,
           name: editName.trim(),
           tagline: editTagline.trim(),
@@ -89,15 +89,17 @@ export const SuperAdminView: React.FC = () => {
           address: editAddress.trim(),
           subscriptionPlan: editPlan,
         };
+        persistTenantToFirestore(updatedBiz).catch(() => {});
+        return updatedBiz;
       }
       return b;
     });
 
     localStorage.setItem('davetech_businesses', JSON.stringify(updatedBusinesses));
+    setBusinesses(updatedBusinesses);
     soundFx.playSuccess();
     logAuditAction('TENANT_UPDATED', `Super Admin updated tenant details: ${editName}`, editingTenant.id);
     setEditingTenant(null);
-    window.location.reload();
   };
 
   const handleCreateTenant = (e: React.FormEvent) => {
@@ -142,9 +144,11 @@ export const SuperAdminView: React.FC = () => {
       domainType: 'subdomain',
     };
 
+    persistTenantToFirestore(newTenant).catch(() => {});
     // Save to localStorage or state
     const updated = [...businesses, newTenant];
     localStorage.setItem('davetech_businesses', JSON.stringify(updated));
+    setBusinesses(updated);
     soundFx.playSuccess();
     logAuditAction('TENANT_CREATED', `Super Admin created new tenant: ${newTenant.name} (${newTenant.mode})`, tenantId);
     setShowNewTenantModal(false);
@@ -154,7 +158,6 @@ export const SuperAdminView: React.FC = () => {
     setNewTenantPhone('');
     setNewTenantEmail('');
     setNewTenantAddress('');
-    window.location.reload();
   };
 
   return (
@@ -328,11 +331,16 @@ export const SuperAdminView: React.FC = () => {
                     <button
                       onClick={() => {
                         soundFx.playClick();
-                        const updated = businesses.map((b) =>
-                          b.id === biz.id ? { ...b, status: b.status === 'suspended' ? 'active' : ('suspended' as const) } : b
-                        );
+                        const updated = businesses.map((b) => {
+                          if (b.id === biz.id) {
+                            const toggled = { ...b, status: b.status === 'suspended' ? 'active' : ('suspended' as const) };
+                            persistTenantToFirestore(toggled).catch(() => {});
+                            return toggled;
+                          }
+                          return b;
+                        });
                         localStorage.setItem('davetech_businesses', JSON.stringify(updated));
-                        window.location.reload();
+                        setBusinesses(updated);
                       }}
                       className="py-2 px-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
                       title="Toggle Status"
@@ -355,11 +363,12 @@ export const SuperAdminView: React.FC = () => {
                       onClick={() => {
                         soundFx.playClick();
                         if (confirm(`Are you sure you want to delete tenant "${biz.name}"? This action cannot be undone.`)) {
+                          deleteTenantFromFirestore(biz.id).catch(() => {});
                           const updated = businesses.filter((b) => b.id !== biz.id);
                           localStorage.setItem('davetech_businesses', JSON.stringify(updated));
+                          setBusinesses(updated);
                           logAuditAction('TENANT_DELETED', `Super Admin deleted tenant: ${biz.name}`, biz.id);
                           soundFx.playSuccess();
-                          window.location.reload();
                         }
                       }}
                       className="py-2 px-2.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-rose-500/30 cursor-pointer"

@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { db, auth } from '../lib/firebase';
+import { doc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 import {
   BusinessTenant,
   BusinessMode,
@@ -62,9 +65,6 @@ import {
   initiateDaraja3StkPush,
   StkPushResult,
 } from '../utils/darajaService';
-import { db, auth } from '../lib/firebase';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
 
 export interface CheckoutTargetInfo {
   tableId?: string;
@@ -81,6 +81,7 @@ export interface CheckoutTargetInfo {
 interface POSContextType {
   // Business / Multi-Tenant
   businesses: BusinessTenant[];
+  setBusinesses: React.Dispatch<React.SetStateAction<BusinessTenant[]>>;
   currentBusiness: BusinessTenant;
   switchBusiness: (bizId: string) => void;
   updateBusiness: (updated: Partial<BusinessTenant>) => void;
@@ -316,6 +317,53 @@ interface POSContextType {
     reference?: string;
     orderNumber?: string;
   }) => Promise<StkPushResult>;
+
+  // Firestore Persistence & Source of Truth Actions
+  persistTenantToFirestore: (tenant: BusinessTenant) => Promise<void>;
+  deleteTenantFromFirestore: (tenantId: string) => Promise<void>;
+  persistProductToFirestore: (product: ProductItem) => Promise<void>;
+  deleteProductFromFirestore: (productId: string) => Promise<void>;
+  persistOrderToFirestore: (order: OrderRecord) => Promise<void>;
+  persistAuditLogToFirestore: (log: AuditLog) => Promise<void>;
+}
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+  };
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: null,
+    },
+    operationType,
+    path,
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -438,7 +486,74 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timestamp: new Date().toISOString(),
     };
     setAuditLogs((prev) => [newLog, ...prev]);
+    persistAuditLogToFirestore(newLog).catch(() => {});
   }, [currentBusinessId, currentCashier]);
+
+  const persistTenantToFirestore = useCallback(async (tenant: BusinessTenant) => {
+    try {
+      await setDoc(doc(db, 'tenants', tenant.id), {
+        ...tenant,
+        tenantId: tenant.id,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `tenants/${tenant.id}`);
+    }
+  }, []);
+
+  const deleteTenantFromFirestore = useCallback(async (tenantId: string) => {
+    try {
+      await deleteDoc(doc(db, 'tenants', tenantId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `tenants/${tenantId}`);
+    }
+  }, []);
+
+  const persistProductToFirestore = useCallback(async (product: ProductItem) => {
+    try {
+      await setDoc(doc(db, 'products', product.id), {
+        ...product,
+        tenantId: currentBusinessId,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `products/${product.id}`);
+    }
+  }, [currentBusinessId]);
+
+  const deleteProductFromFirestore = useCallback(async (productId: string) => {
+    try {
+      await deleteDoc(doc(db, 'products', productId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `products/${productId}`);
+    }
+  }, []);
+
+  const persistOrderToFirestore = useCallback(async (order: OrderRecord) => {
+    try {
+      await setDoc(doc(db, 'orders', order.id), {
+        ...order,
+        tenantId: currentBusinessId,
+      }, { merge: true });
+      await setDoc(doc(db, 'sales', order.id), {
+        ...order,
+        tenantId: currentBusinessId,
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `orders/${order.id}`);
+    }
+  }, [currentBusinessId]);
+
+  const persistAuditLogToFirestore = useCallback(async (log: AuditLog) => {
+    try {
+      await setDoc(doc(db, 'auditLogs', log.id), {
+        ...log,
+        tenantId: currentBusinessId,
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `auditLogs/${log.id}`);
+    }
+  }, [currentBusinessId]);
 
   const addSupplier = useCallback((sup: Omit<Supplier, 'id' | 'businessId'>) => {
     const newSup: Supplier = {
@@ -2493,6 +2608,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <POSContext.Provider
       value={{
         businesses,
+        setBusinesses,
         currentBusiness,
         switchBusiness,
         updateBusiness,
@@ -2651,6 +2767,12 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateDaraja3Config,
         testDaraja3Config,
         triggerDaraja3StkPush,
+        persistTenantToFirestore,
+        deleteTenantFromFirestore,
+        persistProductToFirestore,
+        deleteProductFromFirestore,
+        persistOrderToFirestore,
+        persistAuditLogToFirestore,
       }}
     >
       {children}

@@ -12,12 +12,14 @@ import {
   Layers,
   Activity,
   UserCheck,
+  ArrowLeft,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { BusinessTenant } from '../types/pos';
 import { soundFx } from '../utils/audio';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
+import { SuperAdminView } from './SuperAdminView';
 
 export const PlatformGateway: React.FC = () => {
   const {
@@ -36,6 +38,7 @@ export const PlatformGateway: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('breakthroughcollege03@gmail.com');
   const [currentUserRole, setCurrentUserRole] = useState<'super_admin' | 'manager' | 'cashier'>('super_admin');
+  const [showSuperAdmin, setShowSuperAdmin] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -168,10 +171,7 @@ export const PlatformGateway: React.FC = () => {
             <button
               onClick={() => {
                 soundFx.playClick();
-                setCurrentViewState('super_admin');
-                if (businesses[0]) {
-                  openTenantPOS(businesses[0].id);
-                }
+                setShowSuperAdmin(true);
               }}
               className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
@@ -181,6 +181,24 @@ export const PlatformGateway: React.FC = () => {
           </div>
         </div>
 
+        {showSuperAdmin ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => {
+                  soundFx.playClick();
+                  setShowSuperAdmin(false);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-2xl text-xs font-bold transition-all cursor-pointer border border-slate-700"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Return to Platform Gateway</span>
+              </button>
+            </div>
+            <SuperAdminView />
+          </div>
+        ) : (
+          <>
         {/* Tenant Search & Grid Header */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
@@ -263,6 +281,8 @@ export const PlatformGateway: React.FC = () => {
             </div>
           ))}
         </div>
+          </>
+        )}
       </main>
     </div>
   );
