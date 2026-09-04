@@ -99,6 +99,7 @@ export const OwnerDashboard: React.FC = () => {
     canManageProducts,
     isClearingProducts,
     isProductsLoading,
+    requestManagerAuth,
   } = usePOS();
 
   // Modal states for catalogue management
@@ -905,22 +906,26 @@ export const OwnerDashboard: React.FC = () => {
                   <span>Add Product</span>
                 </button>
 
-                {/* Manager / Admin-only Clear All Items Feature */}
-                {canManageProducts && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundFx.playClick();
+                {/* Clear All Items Button (Always Visible) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    if (canManageProducts) {
                       setShowClearModal(true);
-                    }}
-                    className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl border border-rose-200 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
-                    id="btn-clear-all-items"
-                    title="Remove sample items and start with your own products"
-                  >
-                    <Trash2 className="w-4 h-4 text-rose-600" />
-                    <span>Clear All Items</span>
-                  </button>
-                )}
+                    } else {
+                      requestManagerAuth('Manager Authorization Required to Clear All Items', () => {
+                        setShowClearModal(true);
+                      });
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl border border-rose-200 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                  id="btn-clear-all-items"
+                  title="Remove sample items and start with your own products"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>Clear All Items</span>
+                </button>
               </div>
             </div>
 
@@ -1982,6 +1987,44 @@ export const OwnerDashboard: React.FC = () => {
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Reset All Payments & Start Fresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Product Catalogue Reset Card (Clear All Items) */}
+            <div className="p-5 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-4 shadow-xs" id="card-clear-catalogue-settings">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-amber-600 text-white rounded-2xl shrink-0 mt-0.5 shadow-xs">
+                    <PackageOpen className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900">
+                      Product Catalogue Reset (Clear All Items)
+                    </h3>
+                    <p className="text-xs text-amber-800 leading-relaxed mt-0.5">
+                      Permanently remove all sample products and categories from your inventory catalogue to start fresh with your own items.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    if (canManageProducts) {
+                      setShowClearModal(true);
+                    } else {
+                      requestManagerAuth('Manager Authorization Required to Clear All Items', () => {
+                        setShowClearModal(true);
+                      });
+                    }
+                  }}
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer shrink-0 self-start sm:self-center"
+                  id="btn-settings-clear-all-items"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Clear All Catalogue Items</span>
                 </button>
               </div>
             </div>
