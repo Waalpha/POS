@@ -68,6 +68,21 @@ export const CashierPinModal: React.FC = () => {
       setErrorMessage('Please enter your 4-6 digit PIN');
       return;
     }
+
+    const matched = cashiers.find((c) => c.pin === pin);
+    if (matched?.status === 'suspended') {
+      soundFx.playError();
+      setErrorMessage(`Account for "${matched.name}" is SUSPENDED (${matched.suspensionReason || 'Locked'}). Access denied.`);
+      setPinInput('');
+      return;
+    }
+    if (matched?.status === 'inactive') {
+      soundFx.playError();
+      setErrorMessage(`Account for "${matched.name}" is INACTIVE. Access denied.`);
+      setPinInput('');
+      return;
+    }
+
     const success = loginWithPin(pin);
     if (success) {
       if (!activeShift) {
@@ -101,6 +116,18 @@ export const CashierPinModal: React.FC = () => {
         const exactMatch = cashiers.find((c) => c.pin === nextPin);
         if (exactMatch && nextPin.length >= 4) {
           setTimeout(() => {
+            if (exactMatch.status === 'suspended') {
+              soundFx.playError();
+              setErrorMessage(`Account for "${exactMatch.name}" is SUSPENDED. Access to POS denied.`);
+              setPinInput('');
+              return;
+            }
+            if (exactMatch.status === 'inactive') {
+              soundFx.playError();
+              setErrorMessage(`Account for "${exactMatch.name}" is INACTIVE.`);
+              setPinInput('');
+              return;
+            }
             const success = loginWithPin(nextPin);
             if (success) {
               if (!activeShift) {
@@ -118,10 +145,22 @@ export const CashierPinModal: React.FC = () => {
   };
 
   // Fast quick-login for demo / testing
-  const handleQuickSelectCashier = (pin: string) => {
+  const handleQuickSelectCashier = (cashier: typeof cashiers[0]) => {
     soundFx.playClick();
-    setPinInput(pin);
-    handleVerifyPin(pin);
+    if (cashier.status === 'suspended') {
+      soundFx.playError();
+      setErrorMessage(`Account for "${cashier.name}" is SUSPENDED (${cashier.suspensionReason || 'Account Locked'}).`);
+      setPinInput('');
+      return;
+    }
+    if (cashier.status === 'inactive') {
+      soundFx.playError();
+      setErrorMessage(`Account for "${cashier.name}" is INACTIVE.`);
+      setPinInput('');
+      return;
+    }
+    setPinInput(cashier.pin);
+    handleVerifyPin(cashier.pin);
   };
 
   const handleConfirmShiftStart = () => {
@@ -199,20 +238,36 @@ export const CashierPinModal: React.FC = () => {
                 {filteredCashiers.map((c) => (
                   <button
                     key={c.id}
-                    onClick={() => handleQuickSelectCashier(c.pin)}
+                    onClick={() => handleQuickSelectCashier(c)}
                     className={`p-2.5 rounded-2xl border text-left flex items-center gap-2.5 transition-all shadow-xs cursor-pointer ${
                       currentCashier?.id === c.id
                         ? 'bg-emerald-50 border-emerald-500 text-slate-900 ring-2 ring-emerald-500/20'
+                        : c.status === 'suspended'
+                        ? 'bg-amber-50/70 border-amber-300 text-amber-900 hover:bg-amber-100/80'
+                        : c.status === 'inactive'
+                        ? 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     <div
-                      className={`w-8 h-8 rounded-full ${c.avatarColor} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs`}
+                      className={`w-8 h-8 rounded-full ${c.avatarColor} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs relative`}
                     >
                       {c.name.charAt(0)}
+                      {c.status === 'suspended' && (
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[8px] font-black ring-1 ring-white">
+                          <Lock className="w-2.5 h-2.5" />
+                        </div>
+                      )}
                     </div>
                     <div className="truncate flex-1">
-                      <div className="font-extrabold text-xs leading-tight truncate text-slate-900">{c.name}</div>
+                      <div className="font-extrabold text-xs leading-tight truncate text-slate-900 flex items-center gap-1">
+                        <span className="truncate">{c.name}</span>
+                        {c.status === 'suspended' && (
+                          <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[8px] font-black rounded uppercase shrink-0">
+                            SUSPENDED
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] flex items-center gap-1 mt-0.5">
                         <span
                           className={`px-1.5 py-0.2 rounded font-black text-[9px] uppercase ${

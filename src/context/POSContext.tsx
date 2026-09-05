@@ -121,6 +121,9 @@ interface POSContextType {
   updateCashierUser: (userId: string, updated: Partial<CashierUser>) => void;
   deleteCashierUser: (userId: string) => boolean;
   toggleCashierStatus: (userId: string) => void;
+  suspendCashierUser: (userId: string, reason?: string) => void;
+  unsuspendCashierUser: (userId: string) => void;
+  toggleSuspendCashier: (userId: string, reason?: string) => void;
   resetCashierPassword: (userId: string, newPin: string) => void;
 
   // Chemist & Supply chain
@@ -1717,6 +1720,64 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction('CASHIER_STATUS_TOGGLED', `Toggled status for cashier ID ${userId}`, userId);
   };
 
+  const suspendCashierUser = (userId: string, reason?: string) => {
+    const target = cashiers.find((c) => c.id === userId);
+    if (!target) return;
+    const managerCount = cashiers.filter((c) => c.role === 'manager' && c.status !== 'suspended').length;
+    if (target.role === 'manager' && managerCount <= 1) {
+      soundFx.playError();
+      alert('Cannot suspend the only active Manager account!');
+      return;
+    }
+    soundFx.playError();
+    setCashiers((prev) =>
+      prev.map((c) =>
+        c.id === userId
+          ? {
+              ...c,
+              status: 'suspended',
+              suspensionReason: reason || 'Suspended by Manager',
+              suspendedAt: new Date().toISOString(),
+            }
+          : c
+      )
+    );
+    if (currentCashier?.id === userId) {
+      setCurrentCashier(null);
+      setShowCashierPinModal(true);
+    }
+    logAuditAction('CASHIER_SUSPENDED', `Suspended cashier ${target.name} (${userId}): ${reason || 'Administrative action'}`, userId);
+  };
+
+  const unsuspendCashierUser = (userId: string) => {
+    soundFx.playSuccess();
+    const target = cashiers.find((c) => c.id === userId);
+    if (!target) return;
+    setCashiers((prev) =>
+      prev.map((c) =>
+        c.id === userId
+          ? {
+              ...c,
+              status: 'active',
+              suspensionReason: undefined,
+              suspendedAt: undefined,
+            }
+          : c
+      )
+    );
+    logAuditAction('CASHIER_UNSUSPENDED', `Activated / Unsuspended cashier ${target.name} (${userId})`, userId);
+  };
+
+  const toggleSuspendCashier = (userId: string, reason?: string) => {
+    const target = cashiers.find((c) => c.id === userId);
+    if (!target) return;
+    if (target.status === 'suspended') {
+      unsuspendCashierUser(userId);
+    } else {
+      suspendCashierUser(userId, reason);
+    }
+  };
+
   const resetCashierPassword = (userId: string, newPin: string) => {
     soundFx.playSuccess();
     setCashiers((prev) =>
@@ -1729,6 +1790,10 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loginWithPin = (pin: string): boolean => {
     const user = cashiers.find((c) => c.pin === pin);
     if (user) {
+      if (user.status === 'suspended' || user.status === 'inactive') {
+        soundFx.playError();
+        return false;
+      }
       setCurrentCashier(user);
       soundFx.playSuccess();
       setShowCashierPinModal(false);
@@ -3215,6 +3280,9 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCashierUser,
         deleteCashierUser,
         toggleCashierStatus,
+        suspendCashierUser,
+        unsuspendCashierUser,
+        toggleSuspendCashier,
         resetCashierPassword,
         suppliers,
         addSupplier,

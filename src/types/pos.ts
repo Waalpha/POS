@@ -100,6 +100,8 @@ export function generateSlug(name: string): string {
 
 export type UserRole = 'manager' | 'cashier';
 
+export type CashierStatus = 'active' | 'inactive' | 'suspended';
+
 export interface CashierUser {
   id: string;
   name: string;
@@ -108,7 +110,9 @@ export interface CashierUser {
   avatarColor: string;
   phone?: string;
   email?: string;
-  status?: 'active' | 'inactive';
+  status?: CashierStatus;
+  suspensionReason?: string;
+  suspendedAt?: string;
   activeShiftId?: string;
   lastLogin?: string;
   assignedPosId?: string;

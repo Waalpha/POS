@@ -39,6 +39,7 @@ import {
   FileBarChart,
   Wifi,
   Printer,
+  Ban,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -53,7 +54,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { usePOS } from '../context/POSContext';
-import { BusinessMode, CashierUser, OrderRecord, ProductItem, UserRole } from '../types/pos';
+import { BusinessMode, CashierStatus, CashierUser, OrderRecord, ProductItem, UserRole } from '../types/pos';
 import { soundFx } from '../utils/audio';
 import { Daraja3SettingsCard } from './Daraja3SettingsCard';
 import { ResetPaymentsModal } from './ResetPaymentsModal';
@@ -93,6 +94,9 @@ export const OwnerDashboard: React.FC = () => {
     addCashierUser,
     updateCashierUser,
     deleteCashierUser,
+    suspendCashierUser,
+    unsuspendCashierUser,
+    toggleSuspendCashier,
     printerConfig,
     setShowWifiPrinterModal,
     canManageProducts,
@@ -152,7 +156,7 @@ export const OwnerDashboard: React.FC = () => {
   const [userFormRole, setUserFormRole] = useState<UserRole>('cashier');
   const [userFormPhone, setUserFormPhone] = useState('');
   const [userFormEmail, setUserFormEmail] = useState('');
-  const [userFormStatus, setUserFormStatus] = useState<'active' | 'inactive'>('active');
+  const [userFormStatus, setUserFormStatus] = useState<CashierStatus>('active');
   const [userFormAvatarColor, setUserFormAvatarColor] = useState('bg-emerald-600');
   const [userError, setUserError] = useState('');
 
@@ -1693,12 +1697,15 @@ export const OwnerDashboard: React.FC = () => {
                         {/* Status */}
                         <td className="py-3 px-3">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                              user.status !== 'inactive'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-500 border border-slate-200'
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 ${
+                              user.status === 'suspended'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                : user.status === 'inactive'
+                                ? 'bg-slate-100 text-slate-500 border border-slate-200'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             }`}
                           >
+                            {user.status === 'suspended' && <Lock className="w-2.5 h-2.5" />}
                             {user.status || 'active'}
                           </span>
                         </td>
@@ -1706,6 +1713,27 @@ export const OwnerDashboard: React.FC = () => {
                         {/* Actions */}
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                soundFx.playClick();
+                                if (user.status === 'suspended') {
+                                  unsuspendCashierUser(user.id);
+                                } else {
+                                  const reason = prompt(`Reason for suspending ${user.name}:`, 'Administrative review');
+                                  if (reason !== null) {
+                                    suspendCashierUser(user.id, reason);
+                                  }
+                                }
+                              }}
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                user.status === 'suspended'
+                                  ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                                  : 'bg-amber-50 hover:bg-amber-100 text-amber-700'
+                              }`}
+                              title={user.status === 'suspended' ? 'Unsuspend / Activate User' : 'Suspend User (Immediate POS Lockout)'}
+                            >
+                              {user.status === 'suspended' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                            </button>
                             <button
                               onClick={() => handleOpenEditUser(user)}
                               className="p-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg transition-colors cursor-pointer"
@@ -2285,8 +2313,9 @@ export const OwnerDashboard: React.FC = () => {
                   onChange={(e) => setUserFormStatus(e.target.value as any)}
                   className="w-full px-3 py-2 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 capitalize font-bold"
                 >
-                  <option value="active">Active (Can Login)</option>
-                  <option value="inactive">Inactive (Disabled)</option>
+                  <option value="active">Active (Can Login & Process Sales)</option>
+                  <option value="suspended">Suspended (POS Login Locked - Immediate Action)</option>
+                  <option value="inactive">Inactive (Disabled / Former Staff)</option>
                 </select>
               </div>
 
