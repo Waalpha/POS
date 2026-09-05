@@ -45,8 +45,10 @@ export const Navbar: React.FC = () => {
     businesses,
     currentBusiness,
     switchBusiness,
+    isTenantSubdomain,
     exitTenant,
     logoutPlatform,
+    logoutCashier,
     businessMode,
     currentCashier,
     isManager,
@@ -130,13 +132,13 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* Business Tenant Dropdown (Multi-Tenant SaaS Switcher) */}
+          {/* Tenant Store & Terminal Details Popover (Completely Isolated for Tenant) */}
           <div className="relative">
             <button
               onClick={() => setShowBusinessDropdown(!showBusinessDropdown)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-200 transition-colors shadow-xs cursor-pointer"
-              id="btn-switch-business"
-              title="Multi-Tenant SaaS Switcher"
+              id="btn-store-info"
+              title="Store & Terminal Details"
             >
               <Store className="w-3.5 h-3.5 text-emerald-600" />
               <span className="max-w-[120px] sm:max-w-[160px] truncate">{currentBusiness.name}</span>
@@ -145,65 +147,108 @@ export const Navbar: React.FC = () => {
             </button>
 
             {showBusinessDropdown && (
-              <div className="absolute left-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in slide-in-from-top-2">
-                <div className="px-2 py-1.5 text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>Multi-Tenant SaaS Businesses</span>
-                  <button
-                    onClick={() => {
-                      setShowBusinessDropdown(false);
-                      setCurrentView('super_admin');
-                    }}
-                    className="text-emerald-600 hover:underline text-[10px]"
-                  >
-                    + Super Admin
-                  </button>
+              <div className="absolute left-0 mt-2 w-80 sm:w-88 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2">
+                {/* Header: Store Identity */}
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                      <Store className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900 leading-tight">
+                        {currentBusiness.name}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 capitalize">
+                        {currentBusiness.mode} Branch Workspace
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                    Active
+                  </span>
                 </div>
-                <div className="space-y-1 max-h-80 overflow-y-auto">
-                  {businesses.map((biz) => (
-                    <button
-                      key={biz.id}
-                      onClick={() => {
-                        switchBusiness(biz.id);
-                        setShowBusinessDropdown(false);
-                      }}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                        biz.id === currentBusiness.id
-                          ? 'bg-emerald-600 text-white font-bold shadow-sm'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div>
-                        <div className="font-bold">{biz.name}</div>
-                        <div className={`text-[10px] capitalize ${biz.id === currentBusiness.id ? 'text-emerald-100' : 'text-slate-500'}`}>
-                          {biz.mode} • {biz.address}
-                        </div>
-                      </div>
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${biz.id === currentBusiness.id ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                        {biz.currency}
+
+                {/* Tenant Workspace Info Details */}
+                <div className="py-2.5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
+                    <span className="text-[11px] text-slate-400 font-medium">Domain / Subdomain</span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800 truncate max-w-[170px]">
+                      {currentBusiness.subdomain || `${currentBusiness.slug || 'store'}.ats-kenya.or.ke`}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-slate-400 text-[10px] block">Location</span>
+                      <span className="font-bold text-slate-800 truncate block">{currentBusiness.address || 'Nairobi, Kenya'}</span>
+                    </div>
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-slate-400 text-[10px] block">Telephone</span>
+                      <span className="font-bold text-slate-800 truncate block">{currentBusiness.phone || '+254 700 000 000'}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-slate-400 text-[10px] block">KRA PIN / Tax</span>
+                      <span className="font-mono font-bold text-slate-800 truncate block">{currentBusiness.taxNumber || 'P05...'}</span>
+                    </div>
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-slate-400 text-[10px] block">M-Pesa Setup</span>
+                      <span className="font-mono font-bold text-emerald-700 truncate block">
+                        {currentBusiness.mpesaType === 'till'
+                          ? `Till ${currentBusiness.mpesaTillNumber || '123456'}`
+                          : `Paybill ${currentBusiness.mpesaPaybillNumber || '247247'}`}
                       </span>
+                    </div>
+                  </div>
+
+                  {/* Isolation Guarantee Banner */}
+                  <div className="flex items-center gap-2 p-2 bg-emerald-50/70 border border-emerald-100 rounded-xl text-[10px] text-emerald-800">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Dedicated tenant workspace. Data & orders are strictly isolated.</span>
+                  </div>
+                </div>
+
+                {/* Actions: Switch Cashier / Lock Terminal */}
+                <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setShowBusinessDropdown(false);
+                      setShowCashierPinModal(true);
+                    }}
+                    className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors text-center cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Users className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Switch Cashier</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBusinessDropdown(false);
+                      logoutCashier();
+                    }}
+                    className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors text-center cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Lock Register</span>
+                  </button>
+                </div>
+
+                {/* Dev/Preview fallback only: If in dev preview (not on subdomain) */}
+                {!isTenantSubdomain && (
+                  <div className="mt-2 pt-2 border-t border-slate-100 text-center">
+                    <button
+                      onClick={() => {
+                        setShowBusinessDropdown(false);
+                        exitTenant();
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-slate-600 hover:underline cursor-pointer"
+                    >
+                      Exit to Gateway (Master Platform Preview)
                     </button>
-                  ))}
-                </div>
-                <div className="pt-2 mt-2 border-t border-slate-100 flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setShowBusinessDropdown(false);
-                      exitTenant();
-                    }}
-                    className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors text-center cursor-pointer"
-                  >
-                    Exit Tenant
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowBusinessDropdown(false);
-                      logoutPlatform();
-                    }}
-                    className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-colors text-center cursor-pointer"
-                  >
-                    Logout
-                  </button>
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -432,20 +477,6 @@ export const Navbar: React.FC = () => {
               >
                 <Settings className="w-3.5 h-3.5" />
                 <span>Settings</span>
-              </button>
-
-              {/* Super Admin */}
-              <button
-                onClick={() => setCurrentView('super_admin')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  currentView === 'super_admin'
-                    ? 'bg-rose-600 text-white shadow-sm'
-                    : 'text-rose-600 hover:bg-rose-50 border border-rose-200'
-                }`}
-                id="tab-super-admin"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Super Admin</span>
               </button>
             </>
           )}

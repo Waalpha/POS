@@ -93,6 +93,7 @@ interface POSContextType {
   businessMode: BusinessMode;
   setBusinessMode: (mode: BusinessMode) => void;
   isTenantSelected: boolean;
+  isTenantSubdomain: boolean;
   isTenantLoading: boolean;
   loadingTenantName: string;
   accessDenied: boolean;
@@ -378,56 +379,63 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+export const checkIsTenantSubdomain = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  return (
+    parts.length >= 3 &&
+    !hostname.includes('run.app') &&
+    !hostname.includes('localhost') &&
+    hostname !== 'ats-kenya.or.ke' &&
+    hostname !== 'www.ats-kenya.or.ke'
+  );
+};
+
 const POSContext = createContext<POSContextType | undefined>(undefined);
 
 export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isTenantSubdomain = checkIsTenantSubdomain();
+
   // Load state from localStorage or fallback to seed
   const [businesses, setBusinesses] = useState<BusinessTenant[]>(() => {
     const saved = localStorage.getItem('davetech_businesses');
     let list = saved ? JSON.parse(saved) : INITIAL_BUSINESSES;
 
-    if (typeof window !== 'undefined') {
+    if (checkIsTenantSubdomain()) {
       const hostname = window.location.hostname;
       const parts = hostname.split('.');
-      if (
-        parts.length >= 3 &&
-        !hostname.includes('run.app') &&
-        !hostname.includes('localhost') &&
-        hostname !== 'ats-kenya.or.ke' &&
-        hostname !== 'www.ats-kenya.or.ke'
-      ) {
-        const subSlug = parts[0].toLowerCase();
-        const exists = list.some((b: BusinessTenant) => 
-          b.slug?.toLowerCase() === subSlug ||
-          b.subdomain?.toLowerCase().startsWith(subSlug)
-        );
+      const subSlug = parts[0].toLowerCase();
+      const exists = list.some((b: BusinessTenant) => 
+        b.slug?.toLowerCase() === subSlug ||
+        b.subdomain?.toLowerCase().startsWith(subSlug)
+      );
 
-        if (!exists) {
-          const newTenant: BusinessTenant = {
-            id: `tenant-${subSlug}-${Date.now()}`,
-            name: subSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') + ' POS',
-            tagline: 'Professional POS & Operations',
-            mode: subSlug.includes('med') || subSlug.includes('pharm') || subSlug.includes('chem') ? 'chemist' : 'shop',
-            currency: 'KSh',
-            currencySymbol: 'KSh',
-            taxRate: 0.16,
-            taxNumber: 'P05' + Math.floor(10000000 + Math.random() * 90000000) + 'X',
-            phone: '+254 700 000 000',
-            email: `support@${subSlug}.ats-kenya.or.ke`,
-            address: 'Nairobi, Kenya',
-            receiptFooter: 'Thank you for your business!',
-            mpesaType: 'till',
-            mpesaTillNumber: '123456',
-            mpesaPaybillNumber: '247247',
-            mpesaAccountInstructions: 'Customer Phone or Name',
-            slug: subSlug,
-            subdomain: `${subSlug}.ats-kenya.or.ke`,
-            domainStatus: 'active',
-            domainType: 'subdomain',
-          };
-          list = [newTenant, ...list];
-          localStorage.setItem('davetech_businesses', JSON.stringify(list));
-        }
+      if (!exists) {
+        const newTenant: BusinessTenant = {
+          id: `tenant-${subSlug}-${Date.now()}`,
+          name: subSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') + ' POS',
+          tagline: 'Professional POS & Operations',
+          mode: subSlug.includes('med') || subSlug.includes('pharm') || subSlug.includes('chem') ? 'chemist' : 'shop',
+          currency: 'KSh',
+          currencySymbol: 'KSh',
+          taxRate: 0.16,
+          taxNumber: 'P05' + Math.floor(10000000 + Math.random() * 90000000) + 'X',
+          phone: '+254 700 000 000',
+          email: `support@${subSlug}.ats-kenya.or.ke`,
+          address: 'Nairobi, Kenya',
+          receiptFooter: 'Thank you for your business!',
+          mpesaType: 'till',
+          mpesaTillNumber: '123456',
+          mpesaPaybillNumber: '247247',
+          mpesaAccountInstructions: 'Customer Phone or Name',
+          slug: subSlug,
+          subdomain: `${subSlug}.ats-kenya.or.ke`,
+          domainStatus: 'active',
+          domainType: 'subdomain',
+        };
+        list = [newTenant, ...list];
+        localStorage.setItem('davetech_businesses', JSON.stringify(list));
       }
     }
 
@@ -435,26 +443,18 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentBusinessId, setCurrentBusinessId] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
+    if (checkIsTenantSubdomain()) {
       const hostname = window.location.hostname;
       const parts = hostname.split('.');
-      if (
-        parts.length >= 3 &&
-        !hostname.includes('run.app') &&
-        !hostname.includes('localhost') &&
-        hostname !== 'ats-kenya.or.ke' &&
-        hostname !== 'www.ats-kenya.or.ke'
-      ) {
-        const subSlug = parts[0].toLowerCase();
-        const saved = localStorage.getItem('davetech_businesses');
-        const list = saved ? JSON.parse(saved) : INITIAL_BUSINESSES;
-        const matched = list.find((b: BusinessTenant) => 
-          b.slug?.toLowerCase() === subSlug ||
-          b.subdomain?.toLowerCase().startsWith(subSlug)
-        );
-        if (matched) {
-          return matched.id;
-        }
+      const subSlug = parts[0].toLowerCase();
+      const saved = localStorage.getItem('davetech_businesses');
+      const list = saved ? JSON.parse(saved) : INITIAL_BUSINESSES;
+      const matched = list.find((b: BusinessTenant) => 
+        b.slug?.toLowerCase() === subSlug ||
+        b.subdomain?.toLowerCase().startsWith(subSlug)
+      );
+      if (matched) {
+        return matched.id;
       }
     }
 
@@ -467,18 +467,8 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [businesses, currentBusinessId]);
 
   const [isTenantSelected, setIsTenantSelected] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      const parts = hostname.split('.');
-      if (
-        parts.length >= 3 &&
-        !hostname.includes('run.app') &&
-        !hostname.includes('localhost') &&
-        hostname !== 'ats-kenya.or.ke' &&
-        hostname !== 'www.ats-kenya.or.ke'
-      ) {
-        return true;
-      }
+    if (checkIsTenantSubdomain()) {
+      return true;
     }
     return localStorage.getItem('davetech_is_tenant_selected') === 'true';
   });
@@ -2232,6 +2222,9 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const exitTenant = useCallback(() => {
     soundFx.playClick();
+    if (checkIsTenantSubdomain()) {
+      return;
+    }
     setIsTenantSelected(false);
     localStorage.removeItem('davetech_is_tenant_selected');
     clearCart();
@@ -2240,9 +2233,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logoutPlatform = useCallback(() => {
     soundFx.playClick();
     signOut(auth).then(() => {
-      setIsTenantSelected(false);
-      localStorage.removeItem('davetech_is_tenant_selected');
-      localStorage.removeItem('davetech_current_biz_id');
+      if (!checkIsTenantSubdomain()) {
+        setIsTenantSelected(false);
+        localStorage.removeItem('davetech_is_tenant_selected');
+        localStorage.removeItem('davetech_current_biz_id');
+      }
       window.location.reload();
     }).catch(() => {
       window.location.reload();
@@ -3171,6 +3166,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         businessMode,
         setBusinessMode,
         isTenantSelected,
+        isTenantSubdomain,
         isTenantLoading,
         loadingTenantName,
         accessDenied,

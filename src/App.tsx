@@ -242,8 +242,8 @@ const POSMainLayout: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { isTenantSelected } = usePOS();
-  if (!isTenantSelected) {
+  const { isTenantSelected, isTenantSubdomain } = usePOS();
+  if (!isTenantSelected && !isTenantSubdomain) {
     return <PlatformGateway />;
   }
   return <POSMainLayout />;

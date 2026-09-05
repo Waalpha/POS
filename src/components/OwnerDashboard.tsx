@@ -68,7 +68,6 @@ type DashboardTabType =
   | 'daraja'
   | 'cashiers'
   | 'users'
-  | 'tenants'
   | 'settings';
 
 export const OwnerDashboard: React.FC = () => {
@@ -632,7 +631,6 @@ export const OwnerDashboard: React.FC = () => {
           { id: 'daraja', label: 'Safaricom Daraja 3.0', icon: Smartphone },
           { id: 'cashiers', label: 'Cashier Performance', icon: Award },
           { id: 'users', label: `Users & Permissions (${cashiers.length})`, icon: Users },
-          { id: 'tenants', label: 'Multi-Branch SaaS', icon: Building },
           { id: 'settings', label: 'POS & Tax Settings', icon: Settings },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -1726,69 +1724,7 @@ export const OwnerDashboard: React.FC = () => {
         )}
 
         {/* ========================================================
-            7. MULTI-BRANCH SAAS
-            ======================================================== */}
-        {activeTab === 'tenants' && (
-          <div className="space-y-4">
-            <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3 shadow-xs">
-              <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
-                <Building className="w-4 h-4 text-indigo-600" /> Multi-Tenant Branches & Businesses
-              </h3>
-              <p className="text-xs text-slate-500">
-                Davetech POS architecture isolates data per tenant while allowing centralized multi-location management.
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                {businesses.map((biz) => {
-                  const isActive = biz.id === currentBusiness.id;
-
-                  return (
-                    <div
-                      key={biz.id}
-                      className={`p-4 rounded-2xl border transition-all shadow-xs ${
-                        isActive
-                          ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500/20'
-                          : 'bg-slate-50 border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="font-black text-slate-900 text-sm">{biz.name}</h4>
-                          <p className="text-[11px] text-slate-500">{biz.tagline}</p>
-                          <p className="text-[10px] text-slate-400 mt-1">{biz.address}</p>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-white text-indigo-800 border border-slate-200">
-                          {biz.mode}
-                        </span>
-                      </div>
-
-                      <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between">
-                        <span className="text-[11px] text-slate-500">
-                          Tax PIN: {biz.taxNumber}
-                        </span>
-                        {!isActive ? (
-                          <button
-                            onClick={() => switchBusiness(biz.id)}
-                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
-                          >
-                            Switch to Branch
-                          </button>
-                        ) : (
-                          <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                            <CheckCircle2 className="w-4 h-4" /> Active Terminal
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================
-            8. POS & TAX SETTINGS
+            7. POS & TAX SETTINGS
             ======================================================== */}
         {activeTab === 'settings' && (
           <div className="space-y-6 max-w-2xl">
