@@ -166,7 +166,7 @@ export const ProductGrid: React.FC = () => {
                 <div
                   key={product.id}
                   onClick={() => {
-                    if (isManageItemsMode) {
+                    if (canManageProducts && isManageItemsMode) {
                       soundFx.playClick();
                       setEditingProduct(product);
                       return;
@@ -186,23 +186,25 @@ export const ProductGrid: React.FC = () => {
                   id={`product-card-${product.id}`}
                 >
                   {/* Edit/Delete Product Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      soundFx.playClick();
-                      setEditingProduct(product);
-                    }}
-                    className={`absolute top-2 left-2 z-10 p-1.5 rounded-xl backdrop-blur-md transition-all shadow-xs cursor-pointer ${
-                      isManageItemsMode
-                        ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-300 scale-105'
-                        : 'bg-white/90 hover:bg-white text-slate-700 hover:text-emerald-700 opacity-80 group-hover:opacity-100'
-                    }`}
-                    title={`Edit details or delete ${product.name}`}
-                    id={`btn-edit-product-${product.id}`}
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
+                  {canManageProducts && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundFx.playClick();
+                        setEditingProduct(product);
+                      }}
+                      className={`absolute top-2 left-2 z-10 p-1.5 rounded-xl backdrop-blur-md transition-all shadow-xs cursor-pointer ${
+                        isManageItemsMode
+                          ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-300 scale-105'
+                          : 'bg-white/90 hover:bg-white text-slate-700 hover:text-emerald-700 opacity-80 group-hover:opacity-100'
+                      }`}
+                      title={`Edit details or delete ${product.name}`}
+                      id={`btn-edit-product-${product.id}`}
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
 
                   {/* Cart Quantity Badge */}
                   {inCartCount > 0 && (
