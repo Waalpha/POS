@@ -18,6 +18,8 @@ import {
   FileText,
   RefreshCw,
   X,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { BusinessTenant, BusinessMode, generateSlug } from '../types/pos';
@@ -44,6 +46,7 @@ export const SuperAdminView: React.FC = () => {
   const [tenantToDelete, setTenantToDelete] = useState<BusinessTenant | null>(null);
   const [isDeletingTenant, setIsDeletingTenant] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [copiedSubdomainId, setCopiedSubdomainId] = useState<string | null>(null);
 
   // Edit tenant form state
   const [editingTenant, setEditingTenant] = useState<BusinessTenant | null>(null);
@@ -326,9 +329,24 @@ export const SuperAdminView: React.FC = () => {
                     <div className="space-y-1.5 text-xs text-slate-300 border-t border-slate-700/60 pt-3">
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400">Subdomain:</span>
-                        <code className="text-emerald-400 font-mono text-[11px] truncate max-w-[180px]">
-                          {biz.subdomain || `${biz.slug}.ats-kenya.or.ke`}
-                        </code>
+                        <div className="flex items-center gap-1.5">
+                          <code className="text-emerald-400 font-mono text-[11px] truncate max-w-[140px]">
+                            {biz.subdomain || `${biz.slug}.ats-kenya.or.ke`}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const fullUrl = `https://${biz.subdomain || `${biz.slug}.ats-kenya.or.ke`}`;
+                              navigator.clipboard.writeText(fullUrl);
+                              setCopiedSubdomainId(biz.id);
+                              setTimeout(() => setCopiedSubdomainId(null), 2000);
+                            }}
+                            className="p-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-[10px] transition-all cursor-pointer flex items-center gap-1"
+                            title="Copy URL"
+                          >
+                            {copiedSubdomainId === biz.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          </button>
+                        </div>
                       </div>
                       {biz.customDomain && (
                         <div className="flex justify-between items-center">
