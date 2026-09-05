@@ -282,7 +282,7 @@ export const SettingsView: React.FC = () => {
                 <div>
                   <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Your DAVETECH POS URL</div>
                   <div className="font-mono text-sm font-bold text-emerald-700">
-                    https://{currentBusiness.slug || 'tenant'}.davetech.co.ke
+                    https://{currentBusiness.slug || 'tenant'}.ats-kenya.or.ke
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">Status: <span className="font-bold text-emerald-600 uppercase">Active (Wildcard Subdomain Routing)</span></div>
                 </div>
@@ -291,7 +291,7 @@ export const SettingsView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(`https://${currentBusiness.slug || 'tenant'}.davetech.co.ke`);
+                      navigator.clipboard.writeText(`https://${currentBusiness.slug || 'tenant'}.ats-kenya.or.ke`);
                       setCopiedUrl(true);
                       setTimeout(() => setCopiedUrl(false), 2000);
                     }}

@@ -129,7 +129,7 @@ export const SuperAdminView: React.FC = () => {
       slug = `${baseSlug}-${counter}`;
       counter++;
     }
-    const subdomain = `${slug}.davetech.co.ke`;
+    const subdomain = `${slug}.ats-kenya.or.ke`;
 
     const tenantId = `tenant-${Date.now()}`;
     const newTenant: BusinessTenant = {
@@ -327,7 +327,7 @@ export const SuperAdminView: React.FC = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400">Subdomain:</span>
                         <code className="text-emerald-400 font-mono text-[11px] truncate max-w-[180px]">
-                          {biz.subdomain || `${biz.slug}.davetech.co.ke`}
+                          {biz.subdomain || `${biz.slug}.ats-kenya.or.ke`}
                         </code>
                       </div>
                       {biz.customDomain && (
