@@ -1532,7 +1532,7 @@ export const OwnerDashboard: React.FC = () => {
                         <span className={`px-1.5 py-0.2 rounded font-black text-[9px] uppercase ${c.role === 'manager' ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'}`}>
                           {c.role}
                         </span>
-                        <span className="font-mono font-bold">PIN: {c.pin}</span>
+                        <span className="font-mono font-bold">PIN: ••••</span>
                       </p>
                     </div>
                   </div>

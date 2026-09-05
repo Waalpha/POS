@@ -223,7 +223,7 @@ export const CashierPinModal: React.FC = () => {
                         >
                           {c.role}
                         </span>
-                        <span className="text-slate-400 font-mono font-bold">({c.pin})</span>
+                        <span className="text-slate-400 font-mono font-bold">(••••)</span>
                       </div>
                     </div>
                   </button>

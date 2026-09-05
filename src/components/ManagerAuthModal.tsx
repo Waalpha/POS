@@ -117,8 +117,8 @@ export const ManagerAuthModal: React.FC = () => {
                       MANAGER
                     </span>
                   </div>
-                  <span className="text-[11px] text-emerald-700 font-mono font-bold">
-                    Tap to Authorize ({mgr.pin})
+                  <span className="text-[11px] text-emerald-700 font-bold">
+                    Tap to Authorize
                   </span>
                 </button>
               ))}
