@@ -141,9 +141,7 @@ export const OwnerDashboard: React.FC = () => {
   const [prodFormStock, setProdFormStock] = useState('50');
   const [prodFormReorder, setProdFormReorder] = useState('10');
   const [prodFormDesc, setProdFormDesc] = useState('');
-  const [prodFormImage, setProdFormImage] = useState(
-    'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'
-  );
+  const [prodFormImage, setProdFormImage] = useState('');
 
   // User Management Modal State
   const [showUserModal, setShowUserModal] = useState(false);
@@ -400,7 +398,7 @@ export const OwnerDashboard: React.FC = () => {
     setProdFormStock('50');
     setProdFormReorder('10');
     setProdFormDesc('');
-    setProdFormImage('https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80');
+    setProdFormImage('');
     setShowProductModal(true);
   };
 

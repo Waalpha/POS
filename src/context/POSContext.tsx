@@ -1925,9 +1925,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         businessId: currentBusinessId,
         isAvailable: p.isAvailable ?? true,
         businessModes: p.businessModes || [currentBusiness.mode],
-        imageUrl:
-          p.imageUrl ||
-          'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80',
+        imageUrl: p.imageUrl || '',
       }));
 
       if (db) {

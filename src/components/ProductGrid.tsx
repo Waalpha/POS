@@ -213,17 +213,26 @@ export const ProductGrid: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Large Product Image */}
-                  <div className="relative aspect-[4/3] w-full rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 mb-2.5">
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      referrerPolicy="no-referrer"
-                      className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
-                        isOutOfStock ? 'grayscale' : ''
-                      }`}
-                      loading="lazy"
-                    />
+                  {/* Large Product Image or Clean Icon Placeholder */}
+                  <div className="relative aspect-[4/3] w-full rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 mb-2.5 flex items-center justify-center">
+                    {product.imageUrl && product.imageUrl.trim() !== '' ? (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        referrerPolicy="no-referrer"
+                        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+                          isOutOfStock ? 'grayscale' : ''
+                        }`}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center text-slate-400 group-hover:text-emerald-600 transition-colors">
+                        <Package className="w-8 h-8 stroke-[1.5] mb-1" />
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-2 text-center line-clamp-1">
+                          {product.name}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Out of stock label if tracked and 0 */}
                     {isOutOfStock && (

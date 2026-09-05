@@ -217,9 +217,7 @@ export const ImportProductsModal: React.FC<ImportProductsModalProps> = ({ isOpen
         description: item.description || undefined,
         isAvailable: true,
         businessModes: [currentBusiness.mode],
-        imageUrl: item.isInventory
-          ? 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'
-          : 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=400&q=80',
+        imageUrl: '',
       };
     });
 

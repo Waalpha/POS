@@ -468,7 +468,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
     categoryId: 'cat-drinks',
     price: 380,
     costPrice: 95,
-    imageUrl: 'https://images.unsplash.com/photo-1546173159-315724a31696?w=500&auto=format&fit=crop&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=500&auto=format&fit=crop&q=80',
     sku: 'D-JUICE-03',
     barcode: '61611002003',
     stock: 80,

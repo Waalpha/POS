@@ -24,7 +24,6 @@ const IMAGE_PRESETS = [
   { label: 'Cocktail / Bar', url: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=400&q=80' },
   { label: 'Beer / Ale', url: 'https://images.unsplash.com/photo-1608270192806-03f47e335293?auto=format&fit=crop&w=400&q=80' },
   { label: 'Coffee / Tea', url: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=400&q=80' },
-  { label: 'Salad / Vegan', url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80' },
   { label: 'Hotel Room', url: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=400&q=80' },
   { label: 'Service / Spa', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=400&q=80' },
   { label: 'Retail Goods', url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80' },
@@ -71,8 +70,7 @@ export const EditProductModal: React.FC = () => {
       setSku(editingProduct.sku || '');
       setBarcode(editingProduct.barcode || '');
       setImageUrl(
-        editingProduct.imageUrl ||
-          'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'
+        editingProduct.imageUrl || ''
       );
       setDescription(editingProduct.description || '');
       setIsAvailable(editingProduct.isAvailable !== false);
