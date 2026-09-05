@@ -7,6 +7,9 @@ export type BusinessMode =
   | 'chemist'
   | 'supermarket'
   | 'wholesale'
+  | 'butchery'
+  | 'salon'
+  | 'hardware'
   | 'pos';
 
 export type PaymentMethod = 'cash' | 'mpesa' | 'card' | 'split' | 'room_charge';

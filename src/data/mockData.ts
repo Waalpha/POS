@@ -199,50 +199,79 @@ export const INITIAL_CASHIERS: CashierUser[] = [
   },
 ];
 
-export const CATEGORIES: ProductCategory[] = [
-  {
-    id: 'cat-food',
-    name: 'Food',
-    icon: 'Utensils',
-    color: 'from-amber-500 to-orange-600',
-    description: 'Mains, Burgers, Grills & Pastas',
-  },
-  {
-    id: 'cat-drinks',
-    name: 'Drinks',
-    icon: 'Coffee',
-    color: 'from-cyan-500 to-blue-600',
-    description: 'Hot Coffee, Teas, Juices & Mocktails',
-  },
-  {
-    id: 'cat-bar',
-    name: 'Bar',
-    icon: 'Wine',
-    color: 'from-purple-500 to-pink-600',
-    description: 'Beers, Cocktails, Spirits & Wines',
-  },
-  {
-    id: 'cat-retail',
-    name: 'Retail',
-    icon: 'ShoppingBag',
-    color: 'from-emerald-500 to-teal-600',
-    description: 'Snacks, Merchandise & Groceries',
-  },
-  {
-    id: 'cat-services',
-    name: 'Services',
-    icon: 'Scissors',
-    color: 'from-rose-500 to-red-600',
-    description: 'Salon, Massage, Valet & Grooming',
-  },
-  {
-    id: 'cat-hotel',
-    name: 'Hotel',
-    icon: 'BedDouble',
-    color: 'from-indigo-500 to-violet-600',
-    description: 'Rooms, Laundry, Day Pass & Amenities',
-  },
-];
+export const BUSINESS_CATEGORIES: Record<string, ProductCategory[]> = {
+  chemist: [
+    { id: 'cat-chem-med', name: 'Medicines', icon: 'Pill', color: 'from-teal-500 to-emerald-600', description: 'Tablets, Capsules & General Medications' },
+    { id: 'cat-chem-rx', name: 'Prescription', icon: 'FileText', color: 'from-blue-500 to-indigo-600', description: 'Prescription-only Medications & Antibiotics' },
+    { id: 'cat-chem-otc', name: 'OTC Medicines', icon: 'ShieldCheck', color: 'from-emerald-500 to-teal-600', description: 'Over-the-counter Painkillers, Cold & Flu' },
+    { id: 'cat-chem-supp', name: 'Supplements', icon: 'Zap', color: 'from-amber-500 to-orange-600', description: 'Vitamins, Minerals & Dietary Supplements' },
+    { id: 'cat-chem-baby', name: 'Baby Care', icon: 'Heart', color: 'from-pink-500 to-rose-600', description: 'Baby Formula, Diapers & Skincare' },
+    { id: 'cat-chem-personal', name: 'Personal Care', icon: 'Smile', color: 'from-purple-500 to-pink-600', description: 'Hygiene, Oral Care & Skincare' },
+    { id: 'cat-chem-firstaid', name: 'First Aid', icon: 'Cross', color: 'from-red-500 to-rose-600', description: 'Bandages, Antiseptics & Emergency Kits' },
+    { id: 'cat-chem-supplies', name: 'Medical Supplies', icon: 'Activity', color: 'from-cyan-500 to-blue-600', description: 'Thermometers, Monitors & Diagnostics' },
+    { id: 'cat-chem-cosmetics', name: 'Cosmetics', icon: 'Sparkles', color: 'from-violet-500 to-purple-600', description: 'Dermatological Skincare & Beauty' },
+  ],
+  restaurant: [
+    { id: 'cat-rest-mains', name: 'Mains & Grills', icon: 'Utensils', color: 'from-amber-500 to-orange-600', description: 'Steaks, Burgers, Grills & Pastas' },
+    { id: 'cat-rest-app', name: 'Starters & Salads', icon: 'Flame', color: 'from-orange-500 to-red-600', description: 'Appetizers, Soups & Fresh Salads' },
+    { id: 'cat-rest-hot', name: 'Hot Beverages', icon: 'Coffee', color: 'from-yellow-600 to-amber-700', description: 'Espresso, Teas & Hot Chocolate' },
+    { id: 'cat-rest-cold', name: 'Cold Drinks', icon: 'GlassWater', color: 'from-cyan-500 to-blue-600', description: 'Juices, Sodas & Mocktails' },
+    { id: 'cat-rest-dessert', name: 'Desserts', icon: 'Cake', color: 'from-pink-500 to-rose-600', description: 'Cakes, Pastries & Ice Cream' },
+  ],
+  supermarket: [
+    { id: 'cat-super-fresh', name: 'Fresh Produce', icon: 'Apple', color: 'from-emerald-500 to-green-600', description: 'Fruits, Vegetables & Herbs' },
+    { id: 'cat-super-dairy', name: 'Dairy & Bakery', icon: 'Milk', color: 'from-amber-400 to-yellow-600', description: 'Milk, Cheese, Butter & Fresh Bread' },
+    { id: 'cat-super-pantry', name: 'Pantry & Staples', icon: 'Package', color: 'from-orange-500 to-amber-600', description: 'Rice, Flour, Sugar, Oils & Spices' },
+    { id: 'cat-super-bev', name: 'Beverages', icon: 'Coffee', color: 'from-blue-500 to-cyan-600', description: 'Sodas, Juices, Water & Teas' },
+    { id: 'cat-super-snacks', name: 'Snacks & Sweets', icon: 'Cookie', color: 'from-purple-500 to-pink-600', description: 'Crisps, Chocolates, Biscuits & Nuts' },
+    { id: 'cat-super-cleaning', name: 'Household & Cleaning', icon: 'Sparkles', color: 'from-teal-500 to-emerald-600', description: 'Detergents, Soaps & Tissues' },
+  ],
+  shop: [
+    { id: 'cat-retail-apparel', name: 'Clothing & Apparel', icon: 'Shirt', color: 'from-indigo-500 to-blue-600', description: 'Men, Women & Children Wear' },
+    { id: 'cat-retail-electronics', name: 'Electronics', icon: 'Laptop', color: 'from-slate-700 to-slate-900', description: 'Gadgets, Chargers & Accessories' },
+    { id: 'cat-retail-home', name: 'Home & Living', icon: 'Home', color: 'from-amber-600 to-orange-700', description: 'Decor, Bedding & Kitchenware' },
+    { id: 'cat-retail-stationery', name: 'Stationery & Books', icon: 'BookOpen', color: 'from-emerald-600 to-teal-700', description: 'Notebooks, Pens & Office Supplies' },
+  ],
+  hotel: [
+    { id: 'cat-hotel-rooms', name: 'Room Bookings', icon: 'BedDouble', color: 'from-indigo-500 to-violet-600', description: 'Standard, Deluxe & Executive Suites' },
+    { id: 'cat-hotel-service', name: 'Room Service', icon: 'Utensils', color: 'from-amber-500 to-orange-600', description: 'In-room Dining & Beverages' },
+    { id: 'cat-hotel-laundry', name: 'Laundry Services', icon: 'Shirt', color: 'from-cyan-500 to-blue-600', description: 'Wash, Iron & Dry Cleaning' },
+    { id: 'cat-hotel-spa', name: 'Spa & Wellness', icon: 'Flower2', color: 'from-rose-500 to-pink-600', description: 'Massages, Sauna & Pool Access' },
+  ],
+  bar: [
+    { id: 'cat-bar-beers', name: 'Beers & Ciders', icon: 'Beer', color: 'from-amber-500 to-yellow-600', description: 'Local & Imported Beers, Ciders' },
+    { id: 'cat-bar-spirits', name: 'Spirits & Liquors', icon: 'Wine', color: 'from-purple-600 to-indigo-700', description: 'Whisky, Vodka, Gin, Rum & Tequila' },
+    { id: 'cat-bar-cocktails', name: 'Cocktails', icon: 'GlassWater', color: 'from-pink-500 to-rose-600', description: 'Mojitos, Margaritas & Signature Mixes' },
+    { id: 'cat-bar-wines', name: 'Wines & Champagne', icon: 'Wine', color: 'from-red-600 to-rose-700', description: 'Red, White, Rosé & Sparkling' },
+    { id: 'cat-bar-snacks', name: 'Bar Bites', icon: 'Utensils', color: 'from-amber-600 to-orange-700', description: 'Wings, Fries, Nuts & Platters' },
+  ],
+  butchery: [
+    { id: 'cat-butch-beef', name: 'Beef Cuts', icon: 'Beef', color: 'from-red-600 to-rose-700', description: 'Fillet, Sirloin, T-Bone & Minced Beef' },
+    { id: 'cat-butch-poultry', name: 'Chicken & Poultry', icon: 'Drumstick', color: 'from-amber-500 to-orange-600', description: 'Whole Chicken, Breasts, Wings & Thighs' },
+    { id: 'cat-butch-pork', name: 'Pork & Lamb', icon: 'Beef', color: 'from-pink-600 to-rose-600', description: 'Pork Chops, Ribs & Lamb Chops' },
+    { id: 'cat-butch-sausages', name: 'Sausages & Cold Cuts', icon: 'FileText', color: 'from-orange-600 to-red-600', description: 'Beef Sausages, Polony & Bacon' },
+    { id: 'cat-butch-spices', name: 'Spices & Marinades', icon: 'Flame', color: 'from-yellow-600 to-amber-700', description: 'Rubes, BBQ sauces & Marinades' },
+  ],
+  hardware: [
+    { id: 'cat-hard-tools', name: 'Tools & Hardware', icon: 'Wrench', color: 'from-slate-700 to-slate-900', description: 'Hand tools, Power tools & Fixings' },
+    { id: 'cat-hard-plumbing', name: 'Plumbing & Pipes', icon: 'Wrench', color: 'from-blue-600 to-cyan-700', description: 'PVC Pipes, Faucets, Valves & Fittings' },
+    { id: 'cat-hard-electrical', name: 'Electrical & Lighting', icon: 'Zap', color: 'from-amber-500 to-yellow-600', description: 'Cables, Bulbs, Sockets & Breakers' },
+    { id: 'cat-hard-paints', name: 'Paints & Finishes', icon: 'Sparkles', color: 'from-purple-600 to-indigo-600', description: 'Wall paints, Primers, Brushes & Rollers' },
+  ],
+  services: [
+    { id: 'cat-salon-hair', name: 'Hair Styling & Cut', icon: 'Scissors', color: 'from-rose-500 to-pink-600', description: 'Haircuts, Coloring, Braiding & Styling' },
+    { id: 'cat-salon-nails', name: 'Manicure & Pedicure', icon: 'Sparkles', color: 'from-purple-500 to-indigo-600', description: 'Nail Polish, Gel, Acrylics & Spa Pedi' },
+    { id: 'cat-salon-facial', name: 'Facial & Skincare', icon: 'Smile', color: 'from-amber-500 to-orange-600', description: 'Facials, Waxing & Threading' },
+    { id: 'cat-salon-massage', name: 'Massage & Spa', icon: 'Heart', color: 'from-teal-500 to-emerald-600', description: 'Swedish, Deep Tissue & Aromatherapy' },
+  ],
+  wholesale: [
+    { id: 'cat-whole-grains', name: 'Bulk Grains & Flour', icon: 'Package', color: 'from-amber-600 to-yellow-700', description: 'Maize flour, Rice, Beans & Wheat in 25kg/50kg' },
+    { id: 'cat-whole-bev', name: 'Wholesale Beverages', icon: 'Coffee', color: 'from-blue-600 to-indigo-700', description: 'Crates of Soda, Water & Energy Drinks' },
+    { id: 'cat-whole-household', name: 'Bulk Household', icon: 'Sparkles', color: 'from-teal-600 to-emerald-700', description: 'Cartons of Soap, Cooking Oil & Detergents' },
+  ],
+};
+
+export const CATEGORIES: ProductCategory[] = BUSINESS_CATEGORIES.chemist;
 
 export const INITIAL_PRODUCTS: ProductItem[] = [
   // FOOD (Inventory Tracked)
@@ -729,7 +758,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
   {
     id: 'p-chem-01',
     name: 'Paracetamol 500mg Tablets (Box of 100)',
-    categoryId: 'painkillers',
+    categoryId: 'cat-chemist',
     price: 250,
     costPrice: 150,
     imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=80',
@@ -748,7 +777,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
   {
     id: 'p-chem-02',
     name: 'Amoxicillin 500mg Capsules (Pack of 20)',
-    categoryId: 'antibiotics',
+    categoryId: 'cat-chemist',
     price: 450,
     costPrice: 280,
     imageUrl: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=500&auto=format&fit=crop&q=80',
@@ -767,7 +796,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
   {
     id: 'p-chem-03',
     name: 'Ibuprofen 400mg Anti-inflammatory Tablets',
-    categoryId: 'painkillers',
+    categoryId: 'cat-chemist',
     price: 320,
     costPrice: 190,
     imageUrl: 'https://images.unsplash.com/photo-1550572017-edd951b55104?w=500&auto=format&fit=crop&q=80',
@@ -786,7 +815,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
   {
     id: 'p-chem-04',
     name: 'Benylin Cough & Chest Congestion Syrup 100ml',
-    categoryId: 'syrups',
+    categoryId: 'cat-chemist',
     price: 600,
     costPrice: 380,
     imageUrl: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=500&auto=format&fit=crop&q=80',
@@ -805,7 +834,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
   {
     id: 'p-chem-05',
     name: 'Vitamin C 1000mg Ascorbic Acid (60 Tabs)',
-    categoryId: 'vitamins',
+    categoryId: 'cat-chemist',
     price: 850,
     costPrice: 500,
     imageUrl: 'https://images.unsplash.com/photo-1577401239170-897942555fb3?w=500&auto=format&fit=crop&q=80',
@@ -824,7 +853,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
   {
     id: 'p-chem-06',
     name: 'Sterile First Aid Gauze Bandages & Plasters Kit',
-    categoryId: 'firstaid',
+    categoryId: 'cat-chemist',
     price: 1200,
     costPrice: 700,
     imageUrl: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=500&auto=format&fit=crop&q=80',
@@ -843,7 +872,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
   {
     id: 'p-chem-07',
     name: 'Cetirizine 10mg Allergy Relief Tablets',
-    categoryId: 'prescription',
+    categoryId: 'cat-chemist',
     price: 280,
     costPrice: 160,
     imageUrl: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=500&auto=format&fit=crop&q=80',
@@ -862,7 +891,7 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
   {
     id: 'p-chem-08',
     name: 'Omeprazole 20mg Gastro-Resistant Capsules',
-    categoryId: 'prescription',
+    categoryId: 'cat-chemist',
     price: 550,
     costPrice: 320,
     imageUrl: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=500&auto=format&fit=crop&q=80',

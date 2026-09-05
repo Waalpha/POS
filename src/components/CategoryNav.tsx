@@ -7,14 +7,39 @@ import {
   ShoppingBag,
   Scissors,
   BedDouble,
+  Pill,
+  FileText,
+  ShieldCheck,
+  Zap,
+  Heart,
+  Smile,
+  Cross,
+  Activity,
+  Sparkles,
+  Flame,
+  GlassWater,
+  Cake,
+  Apple,
+  Milk,
+  Package,
+  Cookie,
+  Shirt,
+  Laptop,
+  Home,
+  BookOpen,
+  Flower2,
+  Beer,
+  Beef,
+  Drumstick,
+  Wrench,
   Search,
   Barcode,
   X,
-  Zap,
   Plus,
   Edit2,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
+import { getBusinessConfig } from '../utils/businessConfig';
 import { soundFx } from '../utils/audio';
 
 interface CategoryNavProps {
@@ -36,7 +61,10 @@ export const CategoryNav: React.FC<CategoryNavProps> = ({
     setEditingProduct,
     isManageItemsMode,
     setIsManageItemsMode,
+    currentBusiness,
   } = usePOS();
+
+  const bizConfig = getBusinessConfig(currentBusiness?.mode || 'chemist');
 
   // Helper icon mapper for large touchscreen icons
   const getCategoryIcon = (iconName: string, isSelected: boolean) => {
@@ -57,8 +85,58 @@ export const CategoryNav: React.FC<CategoryNavProps> = ({
         return <Scissors className={iconClass} />;
       case 'BedDouble':
         return <BedDouble className={iconClass} />;
+      case 'Pill':
+        return <Pill className={iconClass} />;
+      case 'FileText':
+        return <FileText className={iconClass} />;
+      case 'ShieldCheck':
+        return <ShieldCheck className={iconClass} />;
+      case 'Zap':
+        return <Zap className={iconClass} />;
+      case 'Heart':
+        return <Heart className={iconClass} />;
+      case 'Smile':
+        return <Smile className={iconClass} />;
+      case 'Cross':
+        return <Cross className={iconClass} />;
+      case 'Activity':
+        return <Activity className={iconClass} />;
+      case 'Sparkles':
+        return <Sparkles className={iconClass} />;
+      case 'Flame':
+        return <Flame className={iconClass} />;
+      case 'GlassWater':
+        return <GlassWater className={iconClass} />;
+      case 'Cake':
+        return <Cake className={iconClass} />;
+      case 'Apple':
+        return <Apple className={iconClass} />;
+      case 'Milk':
+        return <Milk className={iconClass} />;
+      case 'Package':
+        return <Package className={iconClass} />;
+      case 'Cookie':
+        return <Cookie className={iconClass} />;
+      case 'Shirt':
+        return <Shirt className={iconClass} />;
+      case 'Laptop':
+        return <Laptop className={iconClass} />;
+      case 'Home':
+        return <Home className={iconClass} />;
+      case 'BookOpen':
+        return <BookOpen className={iconClass} />;
+      case 'Flower2':
+        return <Flower2 className={iconClass} />;
+      case 'Beer':
+        return <Beer className={iconClass} />;
+      case 'Beef':
+        return <Beef className={iconClass} />;
+      case 'Drumstick':
+        return <Drumstick className={iconClass} />;
+      case 'Wrench':
+        return <Wrench className={iconClass} />;
       default:
-        return <Utensils className={iconClass} />;
+        return <Package className={iconClass} />;
     }
   };
 
@@ -94,7 +172,7 @@ export const CategoryNav: React.FC<CategoryNavProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search items, food, drinks, services or barcode..."
+            placeholder={bizConfig.searchPlaceholder}
             className="w-full pl-10 pr-9 py-2.5 bg-white text-slate-900 placeholder:text-slate-400 text-sm font-semibold rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-xs"
             id="pos-search-input"
           />

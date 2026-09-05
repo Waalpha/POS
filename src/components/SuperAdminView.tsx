@@ -519,10 +519,13 @@ export const SuperAdminView: React.FC = () => {
                     <option value="restaurant">Restaurant & Café</option>
                     <option value="hotel">Hotel & Lounge</option>
                     <option value="bar">Bar & Lounge</option>
+                    <option value="butchery">Butchery</option>
                     <option value="shop">Retail Shop</option>
                     <option value="supermarket">Supermarket</option>
                     <option value="wholesale">Wholesale</option>
-                    <option value="services">Spa & Services</option>
+                    <option value="salon">Salon & Beauty</option>
+                    <option value="hardware">Hardware</option>
+                    <option value="services">Professional Services</option>
                     <option value="pos">General POS</option>
                   </select>
                 </div>
@@ -650,10 +653,13 @@ export const SuperAdminView: React.FC = () => {
                     <option value="restaurant">Restaurant & Café</option>
                     <option value="hotel">Hotel & Lounge</option>
                     <option value="bar">Bar & Lounge</option>
+                    <option value="butchery">Butchery</option>
                     <option value="shop">Retail Shop</option>
                     <option value="supermarket">Supermarket</option>
                     <option value="wholesale">Wholesale</option>
-                    <option value="services">Spa & Services</option>
+                    <option value="salon">Salon & Beauty</option>
+                    <option value="hardware">Hardware</option>
+                    <option value="services">Professional Services</option>
                     <option value="pos">General POS</option>
                   </select>
                 </div>

@@ -226,18 +226,20 @@ export const Navbar: React.FC = () => {
           </button>
 
           {/* Chemist / Pharmacy Module Tab */}
-          <button
-            onClick={() => setCurrentView('chemist')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-              currentView === 'chemist'
-                ? 'bg-emerald-700 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-            id="tab-chemist-view"
-          >
-            <Pill className="w-3.5 h-3.5 text-emerald-300" />
-            <span>Chemist POS</span>
-          </button>
+          {businessMode === 'chemist' && (
+            <button
+              onClick={() => setCurrentView('chemist')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                currentView === 'chemist'
+                  ? 'bg-emerald-700 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+              id="tab-chemist-view"
+            >
+              <Pill className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Chemist POS</span>
+            </button>
+          )}
 
           {/* 2. Tables (Both Roles if hospitality mode) */}
           {(businessMode === 'restaurant' || businessMode === 'hotel' || businessMode === 'bar') && (

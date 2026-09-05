@@ -34,6 +34,7 @@ import {
   INITIAL_BUSINESSES,
   INITIAL_CASHIERS,
   CATEGORIES,
+  BUSINESS_CATEGORIES,
   INITIAL_PRODUCTS,
   INITIAL_TABLES,
   INITIAL_HOTEL_ROOMS,
@@ -145,6 +146,7 @@ interface POSContextType {
 
   // Catalog & Navigation
   categories: ProductCategory[];
+  setCategories: (cats: ProductCategory[]) => void;
   products: ProductItem[];
   selectedCategory: string;
   setSelectedCategory: (catId: string) => void;
@@ -718,38 +720,61 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   });
 
-  const [categories] = useState<ProductCategory[]>(CATEGORIES);
+  const [categories, setCategories] = useState<ProductCategory[]>(() => {
+    const mode = currentBusiness?.mode || 'chemist';
+    return BUSINESS_CATEGORIES[mode] || BUSINESS_CATEGORIES.chemist;
+  });
+
+  useEffect(() => {
+    if (currentBusiness?.mode) {
+      const modeCategories = BUSINESS_CATEGORIES[currentBusiness.mode] || BUSINESS_CATEGORIES.chemist;
+      setCategories(modeCategories);
+      setSelectedCategory('all');
+    }
+  }, [currentBusiness?.mode]);
 
   // Helper to load cached or demo products scoped strictly to tenant
   const getInitialTenantProducts = (tenantId: string): ProductItem[] => {
     const isCleared = localStorage.getItem(`davetech_cleared_products_${tenantId}`) === 'true';
-    if (isCleared) {
-      const stored = localStorage.getItem(`davetech_products_${tenantId}`);
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch {
-          return [];
-        }
-      }
-      return [];
-    }
-
     const tenantStored = localStorage.getItem(`davetech_products_${tenantId}`);
+    
+    let existing: ProductItem[] = [];
     if (tenantStored) {
       try {
         const parsed = JSON.parse(tenantStored);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) existing = parsed;
       } catch {}
     }
 
-    // Default mock items scoped to tenant
-    return INITIAL_PRODUCTS.map((p) => ({
+    const defaultItems = INITIAL_PRODUCTS.map((p) => ({
       ...p,
       id: `${tenantId}-${p.id}`,
       tenantId,
       businessId: tenantId,
     }));
+
+    if (isCleared) {
+      return existing;
+    }
+
+    if (existing.length === 0) {
+      return defaultItems;
+    }
+
+    // Merge any missing items from defaultItems (such as newly added Chemist & Pharmacy items) into existing items
+    const existingIds = new Set(existing.map((item) => item.id));
+    // Also check by name/SKU to prevent duplicates if IDs differ
+    const existingSkus = new Set(existing.map((item) => item.sku).filter(Boolean));
+    const existingNames = new Set(existing.map((item) => item.name.toLowerCase()));
+
+    const missingItems = defaultItems.filter((item) => {
+      if (existingIds.has(item.id)) return false;
+      if (item.sku && existingSkus.has(item.sku)) return false;
+      if (existingNames.has(item.name.toLowerCase())) return false;
+      return true;
+    });
+
+    return [...existing, ...missingItems];
   };
 
   const [products, setProducts] = useState<ProductItem[]>(() => {
@@ -1208,9 +1233,35 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             tenantId,
             businessId: tenantId,
           } as ProductItem));
-          setProducts(items);
-          localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(items));
-          await cacheProductsToDb(items, tenantId);
+
+          const defaultItems = INITIAL_PRODUCTS.map((p) => ({
+            ...p,
+            id: `${tenantId}-${p.id}`,
+            tenantId,
+            businessId: tenantId,
+          }));
+
+          const existingIds = new Set(items.map((item) => item.id));
+          const existingSkus = new Set(items.map((item) => item.sku).filter(Boolean));
+          const existingNames = new Set(items.map((item) => item.name.toLowerCase()));
+
+          const missingItems = defaultItems.filter((item) => {
+            if (existingIds.has(item.id)) return false;
+            if (item.sku && existingSkus.has(item.sku)) return false;
+            if (existingNames.has(item.name.toLowerCase())) return false;
+            return true;
+          });
+
+          const mergedItems = [...items, ...missingItems];
+          setProducts(mergedItems);
+          localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(mergedItems));
+          await cacheProductsToDb(mergedItems, tenantId);
+
+          if (missingItems.length > 0) {
+            Promise.all(
+              missingItems.map((prod) => setDoc(doc(db, 'products', prod.id), prod, { merge: true }))
+            ).catch(() => {});
+          }
         } else if (isCleared) {
           setProducts([]);
           await cacheProductsToDb([], tenantId);
@@ -3081,6 +3132,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         requestManagerAuth,
         executeManagerAuthorizedAction,
         categories,
+        setCategories,
         products,
         selectedCategory,
         setSelectedCategory,

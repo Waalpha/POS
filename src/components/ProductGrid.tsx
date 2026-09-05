@@ -24,32 +24,49 @@ export const ProductGrid: React.FC = () => {
     isManageItemsMode,
     canManageProducts,
     setCurrentView,
+    currentBusiness,
+    categories,
   } = usePOS();
 
   const [customizingProduct, setCustomizingProduct] = useState<ProductItem | null>(null);
   const [selectedModifiers, setSelectedModifiers] = useState<CartModifierSelection[]>([]);
   const [itemNote, setItemNote] = useState<string>('');
 
-  // Filter products by selected category and search keyword
+  // Filter products by business type, selected category and search keyword
   const filteredProducts = useMemo(() => {
+    const validCategoryIds = new Set(categories.map(c => c.id));
+    const currentMode = currentBusiness?.mode || 'chemist';
+
     return products.filter((product) => {
+      // 0. Strict Business Type Isolation
+      if (currentMode === 'chemist') {
+        const isChem = product.categoryId.startsWith('cat-chem') || product.categoryId === 'cat-chemist';
+        if (!isChem) return false;
+      } else {
+        if (validCategoryIds.size > 0 && !validCategoryIds.has(product.categoryId)) {
+          return false;
+        }
+      }
+
       // 1. Category Filter
       if (selectedCategory !== 'all' && product.categoryId !== selectedCategory) {
         return false;
       }
 
-      // 2. Search Query
+      // 2. Search Query Filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesName = product.name.toLowerCase().includes(q);
         const matchesSku = product.sku?.toLowerCase().includes(q);
         const matchesBarcode = product.barcode?.toLowerCase().includes(q);
-        return matchesName || matchesSku || matchesBarcode;
+        if (!matchesName && !matchesSku && !matchesBarcode) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, selectedCategory, searchQuery, currentBusiness?.mode, categories]);
 
   // Open Customize / Modifiers Modal
   const handleOpenCustomize = (product: ProductItem, e: React.MouseEvent) => {

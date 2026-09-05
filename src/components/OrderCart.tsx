@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { OrderType, OrderRecord } from '../types/pos';
+import { getBusinessConfig } from '../utils/businessConfig';
 import { soundFx } from '../utils/audio';
 
 interface OrderCartProps {
@@ -70,7 +71,10 @@ export const OrderCart: React.FC<OrderCartProps> = ({
     openCustomerBill,
     openDirectCartPayment,
     setEditingCartItem,
+    currentBusiness,
   } = usePOS();
+
+  const bizConfig = getBusinessConfig(currentBusiness?.mode || 'chemist');
 
   const [showDiscountModal, setShowDiscountModal] = useState<boolean>(false);
   const [discountInput, setDiscountInput] = useState<string>('');
@@ -78,13 +82,15 @@ export const OrderCart: React.FC<OrderCartProps> = ({
   const [showActiveOrdersDrawer, setShowActiveOrdersDrawer] = useState<boolean>(false);
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
 
-  const orderTypes: { type: OrderType; label: string; icon: React.ReactNode }[] = [
-    { type: 'dine_in', label: 'Dine-In', icon: <Utensils className="w-3.5 h-3.5" /> },
-    { type: 'takeaway', label: 'Takeaway', icon: <ShoppingBag className="w-3.5 h-3.5" /> },
-    { type: 'delivery', label: 'Delivery', icon: <Truck className="w-3.5 h-3.5" /> },
-    { type: 'room_service', label: 'Room Serv', icon: <BedDouble className="w-3.5 h-3.5" /> },
-    { type: 'quick_bar', label: 'Bar Tab', icon: <Wine className="w-3.5 h-3.5" /> },
+  const allOrderTypes: { type: OrderType; label: string; icon: React.ReactNode; allowed: boolean }[] = [
+    { type: 'takeaway', label: 'Walk-in / Sale', icon: <ShoppingBag className="w-3.5 h-3.5" />, allowed: bizConfig.allowTakeaway || true },
+    { type: 'dine_in', label: 'Dine-In', icon: <Utensils className="w-3.5 h-3.5" />, allowed: bizConfig.allowTables },
+    { type: 'delivery', label: 'Delivery', icon: <Truck className="w-3.5 h-3.5" />, allowed: bizConfig.allowDelivery },
+    { type: 'room_service', label: 'Room Serv', icon: <BedDouble className="w-3.5 h-3.5" />, allowed: bizConfig.allowRooms },
+    { type: 'quick_bar', label: 'Bar Tab', icon: <Wine className="w-3.5 h-3.5" />, allowed: bizConfig.allowBarTabs },
   ];
+
+  const orderTypes = allOrderTypes.filter(ot => ot.allowed);
 
   const handleApplyDiscount = (pct: number) => {
     soundFx.playClick();
@@ -238,77 +244,83 @@ export const OrderCart: React.FC<OrderCartProps> = ({
         </div>
 
         {/* Order Type Selector Pills */}
-        <div className="grid grid-cols-5 gap-1 p-1 bg-slate-200/80 rounded-2xl border border-slate-300/60">
-          {orderTypes.map((ot) => (
-            <button
-              key={ot.type}
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setOrderType(ot.type);
-              }}
-              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[10px] font-extrabold transition-all duration-150 cursor-pointer ${
-                orderType === ot.type
-                  ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-300'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
-              }`}
-              id={`ordertype-${ot.type}`}
-            >
-              {ot.icon}
-              <span className="mt-0.5 whitespace-nowrap">{ot.label}</span>
-            </button>
-          ))}
-        </div>
+        {orderTypes.length > 1 && (
+          <div className={`grid grid-cols-${orderTypes.length} gap-1 p-1 bg-slate-200/80 rounded-2xl border border-slate-300/60`}>
+            {orderTypes.map((ot) => (
+              <button
+                key={ot.type}
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setOrderType(ot.type);
+                }}
+                className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[10px] font-extrabold transition-all duration-150 cursor-pointer ${
+                  orderType === ot.type
+                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-300'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/50'
+                }`}
+                id={`ordertype-${ot.type}`}
+              >
+                {ot.icon}
+                <span className="mt-0.5 whitespace-nowrap">{ot.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Dynamic Context Linking: Table / Room / Customer Name */}
         <div className="flex items-center gap-1.5">
           {/* Table assignment */}
-          <button
-            onClick={onOpenTableModal}
-            className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-colors flex items-center justify-between cursor-pointer ${
-              selectedTable
-                ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-black'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-            id="btn-select-table"
-          >
-            <span className="truncate">
-              {selectedTable ? `Table: ${selectedTable.name}` : '+ Table'}
-            </span>
-            {selectedTable && (
-              <X
-                className="w-3.5 h-3.5 text-emerald-700 hover:text-emerald-900 shrink-0 ml-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedTable(null);
-                }}
-              />
-            )}
-          </button>
+          {bizConfig.allowTables && (
+            <button
+              onClick={onOpenTableModal}
+              className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-colors flex items-center justify-between cursor-pointer ${
+                selectedTable
+                  ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-black'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              id="btn-select-table"
+            >
+              <span className="truncate">
+                {selectedTable ? `Table: ${selectedTable.name}` : '+ Table'}
+              </span>
+              {selectedTable && (
+                <X
+                  className="w-3.5 h-3.5 text-emerald-700 hover:text-emerald-900 shrink-0 ml-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedTable(null);
+                  }}
+                />
+              )}
+            </button>
+          )}
 
           {/* Room assignment */}
-          <button
-            onClick={onOpenRoomModal}
-            className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-colors flex items-center justify-between cursor-pointer ${
-              selectedRoom
-                ? 'bg-indigo-50 border-indigo-400 text-indigo-900 font-black'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-            id="btn-select-room"
-          >
-            <span className="truncate">
-              {selectedRoom ? `Room ${selectedRoom.roomNumber}` : '+ Room'}
-            </span>
-            {selectedRoom && (
-              <X
-                className="w-3.5 h-3.5 text-indigo-700 hover:text-indigo-900 shrink-0 ml-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedRoom(null);
-                }}
-              />
-            )}
-          </button>
+          {bizConfig.allowRooms && (
+            <button
+              onClick={onOpenRoomModal}
+              className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-colors flex items-center justify-between cursor-pointer ${
+                selectedRoom
+                  ? 'bg-indigo-50 border-indigo-400 text-indigo-900 font-black'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              id="btn-select-room"
+            >
+              <span className="truncate">
+                {selectedRoom ? `Room ${selectedRoom.roomNumber}` : '+ Room'}
+              </span>
+              {selectedRoom && (
+                <X
+                  className="w-3.5 h-3.5 text-indigo-700 hover:text-indigo-900 shrink-0 ml-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRoom(null);
+                  }}
+                />
+              )}
+            </button>
+          )}
 
           {/* Customer Input */}
           <div className="relative flex-1">
