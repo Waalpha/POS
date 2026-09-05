@@ -34,6 +34,7 @@ import {
   Pill,
   Truck,
   ShoppingBag,
+  Layers,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { BusinessMode, POSViewType } from '../types/pos';
@@ -102,9 +103,16 @@ export const Navbar: React.FC = () => {
         {/* Left: Brand & Business Switcher */}
         <div className="flex items-center gap-2">
           <div
-            onClick={() => setCurrentView('pos')}
+            onClick={() => {
+              if (!isTenantSubdomain) {
+                exitTenant();
+              } else {
+                setCurrentView('pos');
+              }
+            }}
             className="flex items-center gap-2 cursor-pointer group"
             id="nav-brand-logo"
+            title={!isTenantSubdomain ? "Click to return to Master Platform" : "Davetech POS"}
           >
             <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-500 to-emerald-500 flex items-center justify-center font-bold text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform shrink-0">
               <Store className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -133,7 +141,7 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Tenant Store & Terminal Details Popover (Completely Isolated for Tenant) */}
-          <div className="relative">
+          <div className="relative flex items-center gap-1.5">
             <button
               onClick={() => setShowBusinessDropdown(!showBusinessDropdown)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-200 transition-colors shadow-xs cursor-pointer"
@@ -146,8 +154,44 @@ export const Navbar: React.FC = () => {
               <ChevronDown className="w-3 h-3 text-emerald-500" />
             </button>
 
+            {/* Main Domain SaaS Platform Controls: Always accessible on ats-kenya.or.ke & dev preview */}
+            {!isTenantSubdomain && (
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <button
+                  onClick={() => {
+                    soundFx.playClick();
+                    exitTenant();
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-slate-800 hover:to-indigo-900 text-white text-xs font-black rounded-xl shadow-md border border-indigo-500/40 transition-all cursor-pointer group"
+                  id="btn-nav-master-platform"
+                  title="Return to Master SaaS Platform Gateway & All Tenants"
+                >
+                  <Layers className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+                  <span className="hidden sm:inline">Master Platform</span>
+                  <span className="sm:hidden">Platform</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    soundFx.playClick();
+                    setCurrentView('super_admin');
+                  }}
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    currentView === 'super_admin'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+                  }`}
+                  id="btn-nav-super-admin"
+                  title="Global SaaS Super Admin Control"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span className="hidden md:inline">Super Admin</span>
+                </button>
+              </div>
+            )}
+
             {showBusinessDropdown && (
-              <div className="absolute left-0 mt-2 w-80 sm:w-88 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="absolute left-0 top-full mt-2 w-80 sm:w-88 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2">
                 {/* Header: Store Identity */}
                 <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
                   <div className="flex items-center gap-2">
@@ -235,18 +279,57 @@ export const Navbar: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Dev/Preview fallback only: If in dev preview (not on subdomain) */}
+                {/* Main Domain Master Platform Quick Actions & Switcher */}
                 {!isTenantSubdomain && (
-                  <div className="mt-2 pt-2 border-t border-slate-100 text-center">
+                  <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
                     <button
                       onClick={() => {
                         setShowBusinessDropdown(false);
                         exitTenant();
                       }}
-                      className="text-[10px] text-slate-400 hover:text-slate-600 hover:underline cursor-pointer"
+                      className="w-full py-2.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-xl text-xs font-black transition-all text-center cursor-pointer flex items-center justify-center gap-2 shadow-sm border border-indigo-500/30"
                     >
-                      Exit to Gateway (Master Platform Preview)
+                      <Layers className="w-4 h-4 text-emerald-400" />
+                      <span>Return to Master Platform Gateway</span>
                     </button>
+
+                    <div className="pt-1">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Switch Tenant (Main Domain)</span>
+                        <button
+                          onClick={() => {
+                            setShowBusinessDropdown(false);
+                            setCurrentView('super_admin');
+                          }}
+                          className="text-rose-600 hover:underline font-bold text-[10px]"
+                        >
+                          Super Admin
+                        </button>
+                      </div>
+                      <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                        {businesses.map((biz) => (
+                          <button
+                            key={biz.id}
+                            onClick={() => {
+                              switchBusiness(biz.id);
+                              setShowBusinessDropdown(false);
+                            }}
+                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                              biz.id === currentBusiness.id
+                                ? 'bg-emerald-600 text-white font-bold'
+                                : 'hover:bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            <span className="truncate max-w-[170px]">{biz.name}</span>
+                            <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                              biz.id === currentBusiness.id ? 'bg-emerald-700 text-white' : 'bg-slate-200/70 text-slate-700'
+                            }`}>
+                              {biz.mode}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

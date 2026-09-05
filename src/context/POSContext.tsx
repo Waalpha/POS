@@ -94,6 +94,7 @@ interface POSContextType {
   setBusinessMode: (mode: BusinessMode) => void;
   isTenantSelected: boolean;
   isTenantSubdomain: boolean;
+  isMainDomain: boolean;
   isTenantLoading: boolean;
   loadingTenantName: string;
   accessDenied: boolean;
@@ -381,7 +382,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 export const checkIsTenantSubdomain = (): boolean => {
   if (typeof window === 'undefined') return false;
-  const hostname = window.location.hostname;
+  const hostname = window.location.hostname.toLowerCase();
   const parts = hostname.split('.');
   return (
     parts.length >= 3 &&
@@ -392,10 +393,20 @@ export const checkIsTenantSubdomain = (): boolean => {
   );
 };
 
+export const checkIsMainDomain = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname.toLowerCase();
+  return (
+    hostname === 'ats-kenya.or.ke' ||
+    hostname === 'www.ats-kenya.or.ke'
+  );
+};
+
 const POSContext = createContext<POSContextType | undefined>(undefined);
 
 export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isTenantSubdomain = checkIsTenantSubdomain();
+  const isMainDomain = checkIsMainDomain();
 
   // Load state from localStorage or fallback to seed
   const [businesses, setBusinesses] = useState<BusinessTenant[]>(() => {
@@ -470,7 +481,18 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (checkIsTenantSubdomain()) {
       return true;
     }
-    return localStorage.getItem('davetech_is_tenant_selected') === 'true';
+    if (checkIsMainDomain()) {
+      // Main domain ats-kenya.or.ke defaults to the Master Platform Gateway!
+      // Clear any stale localStorage trap from previous sessions
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('davetech_is_tenant_selected');
+      }
+      return sessionStorage.getItem('davetech_is_tenant_selected') === 'true';
+    }
+    return (
+      sessionStorage.getItem('davetech_is_tenant_selected') === 'true' ||
+      localStorage.getItem('davetech_is_tenant_selected') === 'true'
+    );
   });
   const [isTenantLoading, setIsTenantLoading] = useState<boolean>(false);
   const [loadingTenantName, setLoadingTenantName] = useState<string>('');
@@ -2212,13 +2234,14 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTimeout(() => {
       setCurrentBusinessId(tenantId);
       localStorage.setItem('davetech_current_biz_id', tenantId);
+      sessionStorage.setItem('davetech_is_tenant_selected', 'true');
       localStorage.setItem('davetech_is_tenant_selected', 'true');
       setIsTenantSelected(true);
       setIsTenantLoading(false);
       clearCart();
       setCurrentView('pos');
     }, 600);
-  }, [businesses]);
+  }, [businesses, clearCart]);
 
   const exitTenant = useCallback(() => {
     soundFx.playClick();
@@ -2226,6 +2249,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     setIsTenantSelected(false);
+    sessionStorage.removeItem('davetech_is_tenant_selected');
     localStorage.removeItem('davetech_is_tenant_selected');
     clearCart();
   }, [clearCart]);
@@ -2235,6 +2259,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     signOut(auth).then(() => {
       if (!checkIsTenantSubdomain()) {
         setIsTenantSelected(false);
+        sessionStorage.removeItem('davetech_is_tenant_selected');
         localStorage.removeItem('davetech_is_tenant_selected');
         localStorage.removeItem('davetech_current_biz_id');
       }
@@ -3167,6 +3192,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setBusinessMode,
         isTenantSelected,
         isTenantSubdomain,
+        isMainDomain,
         isTenantLoading,
         loadingTenantName,
         accessDenied,

@@ -99,6 +99,8 @@ export const OwnerDashboard: React.FC = () => {
     isClearingProducts,
     isProductsLoading,
     requestManagerAuth,
+    exitTenant,
+    isTenantSubdomain,
   } = usePOS();
 
   // Modal states for catalogue management
@@ -598,6 +600,21 @@ export const OwnerDashboard: React.FC = () => {
 
         {/* Global Actions */}
         <div className="flex items-center gap-2 flex-wrap">
+          {!isTenantSubdomain && (
+            <button
+              onClick={() => {
+                soundFx.playClick();
+                exitTenant();
+              }}
+              className="px-3.5 py-2 bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-slate-800 hover:to-indigo-900 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer border border-indigo-500/40"
+              id="btn-dashboard-master-platform"
+              title="Return to Master SaaS Platform Gateway"
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Master Platform</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
               soundFx.playClick();
