@@ -726,23 +726,58 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentBusinessId]);
 
+  const persistCashierToFirestore = useCallback(async (cashier: CashierUser) => {
+    try {
+      await setDoc(doc(db, 'cashiers', cashier.id), {
+        ...cashier,
+        tenantId: currentBusinessId,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `cashiers/${cashier.id}`);
+    }
+  }, [currentBusinessId]);
+
+  const deleteCashierFromFirestore = useCallback(async (cashierId: string) => {
+    try {
+      await deleteDoc(doc(db, 'cashiers', cashierId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `cashiers/${cashierId}`);
+    }
+  }, []);
+
   const addSupplier = useCallback((sup: Omit<Supplier, 'id' | 'businessId'>) => {
     const newSup: Supplier = {
       ...sup,
-      id: `sup-${Date.now()}`,
+      id: `sup-${currentBusinessId}-${Date.now()}`,
       businessId: currentBusinessId,
     };
     setSuppliers((prev) => [...prev, newSup]);
+    if (db) {
+      setDoc(doc(db, 'suppliers', newSup.id), { ...newSup, tenantId: currentBusinessId, updatedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Supplier add error:', err)
+      );
+    }
     logAuditAction('SUPPLIER_ADDED', `Added supplier ${newSup.name}`, newSup.id);
   }, [currentBusinessId, logAuditAction]);
 
   const updateSupplier = useCallback((supId: string, updated: Partial<Supplier>) => {
     setSuppliers((prev) => prev.map((s) => (s.id === supId ? { ...s, ...updated } : s)));
+    if (db) {
+      setDoc(doc(db, 'suppliers', supId), { ...updated, tenantId: currentBusinessId, updatedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Supplier update error:', err)
+      );
+    }
     logAuditAction('SUPPLIER_UPDATED', `Updated supplier ID ${supId}`, supId);
-  }, [logAuditAction]);
+  }, [currentBusinessId, logAuditAction]);
 
   const deleteSupplier = useCallback((supId: string) => {
     setSuppliers((prev) => prev.filter((s) => s.id !== supId));
+    if (db) {
+      deleteDoc(doc(db, 'suppliers', supId)).catch((err) =>
+        console.warn('[Firestore] Supplier delete error:', err)
+      );
+    }
     logAuditAction('SUPPLIER_DELETED', `Deleted supplier ID ${supId}`, supId);
   }, [logAuditAction]);
 
@@ -756,18 +791,36 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setPurchases((prev) => [newPur, ...prev]);
 
+    if (db) {
+      setDoc(doc(db, 'purchases', newPur.id), { ...newPur, tenantId: currentBusinessId }, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Purchase add error:', err)
+      );
+    }
+
     setProducts((prevProds) => {
       return prevProds.map((prod) => {
         const itemDetail = record.items.find((i) => i.productId === prod.id);
         if (!itemDetail) return prod;
         const currentStock = prod.stock ?? 0;
         const newStock = currentStock + itemDetail.quantity;
-        return {
+        const updatedProduct = {
           ...prod,
           stock: newStock,
           batchNumber: itemDetail.batchNumber || prod.batchNumber,
           expiryDate: itemDetail.expiryDate || prod.expiryDate,
+          updatedAt: new Date().toISOString(),
         };
+        if (db) {
+          setDoc(doc(db, 'products', prod.id), {
+            stock: newStock,
+            batchNumber: updatedProduct.batchNumber,
+            expiryDate: updatedProduct.expiryDate,
+            updatedAt: updatedProduct.updatedAt,
+          }, { merge: true }).catch((err) =>
+            console.warn('[Firestore] Product stock sync on purchase error:', err)
+          );
+        }
+        return updatedProduct;
       });
     });
 
@@ -794,6 +847,14 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cashierName: currentCashier?.name || 'Manager',
         };
         setStockMovements((m) => [movement, ...m]);
+        if (db) {
+          setDoc(doc(db, 'stockMovements', movement.id), { ...movement, tenantId: currentBusinessId }, { merge: true }).catch((err) =>
+            console.warn('[Firestore] Stock movement sync error:', err)
+          );
+          setDoc(doc(db, 'products', productId), { stock: newStock, updatedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
+            console.warn('[Firestore] Product stock adjust sync error:', err)
+          );
+        }
         return { ...p, stock: newStock };
       })
     );
@@ -1464,6 +1525,68 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Real-time Firestore Cashiers synchronization for currentBusinessId
+  useEffect(() => {
+    if (!currentBusinessId || !db) return;
+    try {
+      const q = query(collection(db, 'cashiers'), where('tenantId', '==', currentBusinessId));
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreCashiers: CashierUser[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as CashierUser;
+              if (data && (data.id || docSnap.id) && data.name) {
+                firestoreCashiers.push({ ...data, id: data.id || docSnap.id, tenantId: currentBusinessId });
+              }
+            });
+            if (firestoreCashiers.length > 0) {
+              setCashiers(firestoreCashiers);
+              localStorage.setItem('davetech_cashiers', JSON.stringify(firestoreCashiers));
+              localStorage.setItem(`davetech_cashiers_${currentBusinessId}`, JSON.stringify(firestoreCashiers));
+              cacheCashiersToDb(firestoreCashiers, currentBusinessId).catch(() => {});
+
+              // Auto-lock if logged-in cashier got suspended or deleted
+              setCurrentCashier((prev) => {
+                if (!prev) return null;
+                const match = firestoreCashiers.find((c) => c.id === prev.id);
+                if (!match || match.status === 'suspended' || match.status === 'inactive') {
+                  setShowCashierPinModal(true);
+                  return null;
+                }
+                return match;
+              });
+            }
+          } else {
+            // Seed initial cashiers to Firestore for this business tenant if empty
+            const initial = INITIAL_CASHIERS.map((c) => ({
+              ...c,
+              id: `${currentBusinessId}-${c.id}`,
+              tenantId: currentBusinessId,
+              status: c.status || 'active',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }));
+            setCashiers(initial);
+            localStorage.setItem('davetech_cashiers', JSON.stringify(initial));
+            localStorage.setItem(`davetech_cashiers_${currentBusinessId}`, JSON.stringify(initial));
+            cacheCashiersToDb(initial, currentBusinessId).catch(() => {});
+            Promise.all(
+              initial.map((c) => setDoc(doc(db, 'cashiers', c.id), c, { merge: true }))
+            ).catch((err) => console.warn('[Firestore] Error seeding initial cashiers:', err));
+          }
+        },
+        (err) => {
+          console.warn('[Firestore] Cashiers snapshot fallback to local:', err);
+        }
+      );
+      return () => unsub();
+    } catch (e) {
+      console.warn('[Firestore] Could not establish cashiers snapshot:', e);
+    }
+  }, [currentBusinessId]);
+
   useEffect(() => {
     localStorage.setItem('davetech_current_biz_id', currentBusinessId);
   }, [currentBusinessId]);
@@ -1667,24 +1790,54 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateBusiness({ mode });
   };
 
-  // Cashier User Management (Manager only)
+  // Cashier User Management (Manager only) - Persisted to Firebase Firestore & Offline Cache
   const addCashierUser = (user: Omit<CashierUser, 'id'>) => {
     soundFx.playSuccess();
     const newUser: CashierUser = {
       ...user,
-      id: `cashier-${Date.now()}`,
+      id: `cashier-${currentBusinessId}-${Date.now()}`,
+      tenantId: currentBusinessId,
+      status: user.status || 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     setCashiers((prev) => [...prev, newUser]);
+    persistCashierToFirestore(newUser).catch((err) =>
+      console.warn('[Firestore] Cashier add error:', err)
+    );
+    logAuditAction('CASHIER_ADDED', `Created cashier "${newUser.name}" (${newUser.role})`, newUser.id);
   };
 
   const updateCashierUser = (userId: string, updated: Partial<CashierUser>) => {
     soundFx.playSuccess();
+    const updatePayload = {
+      ...updated,
+      tenantId: currentBusinessId,
+      updatedAt: new Date().toISOString(),
+    };
+    let updatedCashier: CashierUser | null = null;
     setCashiers((prev) =>
-      prev.map((c) => (c.id === userId ? { ...c, ...updated } : c))
+      prev.map((c) => {
+        if (c.id === userId) {
+          updatedCashier = { ...c, ...updatePayload };
+          return updatedCashier;
+        }
+        return c;
+      })
     );
     if (currentCashier?.id === userId) {
-      setCurrentCashier((prev) => (prev ? { ...prev, ...updated } : null));
+      setCurrentCashier((prev) => (prev ? { ...prev, ...updatePayload } : null));
     }
+    if (updatedCashier) {
+      persistCashierToFirestore(updatedCashier).catch((err) =>
+        console.warn('[Firestore] Cashier update error:', err)
+      );
+    } else if (db) {
+      setDoc(doc(db, 'cashiers', userId), updatePayload, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Cashier update error:', err)
+      );
+    }
+    logAuditAction('CASHIER_UPDATED', `Updated profile/role for cashier ID ${userId}`, userId);
   };
 
   const deleteCashierUser = (userId: string): boolean => {
@@ -1702,21 +1855,31 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const remaining = cashiers.filter((c) => c.id !== userId);
       setCurrentCashier(remaining[0] || null);
     }
-    logAuditAction('CASHIER_DELETED', `Deleted cashier ID ${userId}`, userId);
+    deleteCashierFromFirestore(userId).catch((err) =>
+      console.warn('[Firestore] Cashier delete error:', err)
+    );
+    logAuditAction('CASHIER_DELETED', `Deleted cashier ID ${userId} (${target.name})`, userId);
     return true;
   };
 
   const toggleCashierStatus = (userId: string) => {
     soundFx.playClick();
+    let updatedCashier: CashierUser | null = null;
     setCashiers((prev) =>
       prev.map((c) => {
         if (c.id === userId) {
           const newStatus = c.status === 'inactive' ? 'active' : 'inactive';
-          return { ...c, status: newStatus as any };
+          updatedCashier = { ...c, status: newStatus as any, updatedAt: new Date().toISOString() };
+          return updatedCashier;
         }
         return c;
       })
     );
+    if (updatedCashier) {
+      persistCashierToFirestore(updatedCashier).catch((err) =>
+        console.warn('[Firestore] Cashier toggle status error:', err)
+      );
+    }
     logAuditAction('CASHIER_STATUS_TOGGLED', `Toggled status for cashier ID ${userId}`, userId);
   };
 
@@ -1730,21 +1893,30 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     soundFx.playError();
+    const suspendedData = {
+      status: 'suspended' as const,
+      suspensionReason: reason || 'Suspended by Manager',
+      suspendedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    let updatedCashier: CashierUser | null = null;
     setCashiers((prev) =>
-      prev.map((c) =>
-        c.id === userId
-          ? {
-              ...c,
-              status: 'suspended',
-              suspensionReason: reason || 'Suspended by Manager',
-              suspendedAt: new Date().toISOString(),
-            }
-          : c
-      )
+      prev.map((c) => {
+        if (c.id === userId) {
+          updatedCashier = { ...c, ...suspendedData };
+          return updatedCashier;
+        }
+        return c;
+      })
     );
     if (currentCashier?.id === userId) {
       setCurrentCashier(null);
       setShowCashierPinModal(true);
+    }
+    if (updatedCashier) {
+      persistCashierToFirestore(updatedCashier).catch((err) =>
+        console.warn('[Firestore] Cashier suspend error:', err)
+      );
     }
     logAuditAction('CASHIER_SUSPENDED', `Suspended cashier ${target.name} (${userId}): ${reason || 'Administrative action'}`, userId);
   };
@@ -1753,18 +1925,27 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     soundFx.playSuccess();
     const target = cashiers.find((c) => c.id === userId);
     if (!target) return;
+    let updatedCashier: CashierUser | null = null;
     setCashiers((prev) =>
-      prev.map((c) =>
-        c.id === userId
-          ? {
-              ...c,
-              status: 'active',
-              suspensionReason: undefined,
-              suspendedAt: undefined,
-            }
-          : c
-      )
+      prev.map((c) => {
+        if (c.id === userId) {
+          updatedCashier = {
+            ...c,
+            status: 'active',
+            suspensionReason: undefined,
+            suspendedAt: undefined,
+            updatedAt: new Date().toISOString(),
+          };
+          return updatedCashier;
+        }
+        return c;
+      })
     );
+    if (updatedCashier) {
+      persistCashierToFirestore(updatedCashier).catch((err) =>
+        console.warn('[Firestore] Cashier unsuspend error:', err)
+      );
+    }
     logAuditAction('CASHIER_UNSUSPENDED', `Activated / Unsuspended cashier ${target.name} (${userId})`, userId);
   };
 
@@ -1780,9 +1961,24 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetCashierPassword = (userId: string, newPin: string) => {
     soundFx.playSuccess();
+    let updatedCashier: CashierUser | null = null;
     setCashiers((prev) =>
-      prev.map((c) => (c.id === userId ? { ...c, pin: newPin } : c))
+      prev.map((c) => {
+        if (c.id === userId) {
+          updatedCashier = { ...c, pin: newPin, updatedAt: new Date().toISOString() };
+          return updatedCashier;
+        }
+        return c;
+      })
     );
+    if (currentCashier?.id === userId) {
+      setCurrentCashier((prev) => (prev ? { ...prev, pin: newPin, updatedAt: new Date().toISOString() } : null));
+    }
+    if (updatedCashier) {
+      persistCashierToFirestore(updatedCashier).catch((err) =>
+        console.warn('[Firestore] Cashier reset PIN error:', err)
+      );
+    }
     logAuditAction('CASHIER_PIN_RESET', `Reset PIN for cashier ID ${userId}`, userId);
   };
 
@@ -1861,6 +2057,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setActiveShift(newShift);
     saveShiftToDb(newShift).catch(() => {});
+    if (db) {
+      setDoc(doc(db, 'shifts', newShift.id), { ...newShift, tenantId: currentBusiness.id }, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Shift start sync:', err)
+      );
+    }
   };
 
   const endShift = (closingCashActual: number): ShiftRecord | null => {
@@ -1874,6 +2075,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setActiveShift(null);
     saveShiftToDb(closed).catch(() => {});
+    if (db) {
+      setDoc(doc(db, 'shifts', closed.id), { ...closed, tenantId: currentBusiness.id }, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Shift end sync:', err)
+      );
+    }
     return closed;
   };
 
@@ -1895,6 +2101,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ],
       };
       saveShiftToDb(updated).catch(() => {});
+      if (db) {
+        setDoc(doc(db, 'shifts', updated.id), { ...updated, tenantId: currentBusiness.id }, { merge: true }).catch((err) =>
+          console.warn('[Firestore] Cash drop sync:', err)
+        );
+      }
       return updated;
     });
   };
@@ -1906,11 +2117,19 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((p) => {
         if (p.id === productId) {
           const nextIsInventory = !p.isInventory;
-          return {
+          const nextStock = nextIsInventory ? (p.stock !== undefined ? p.stock : 20) : undefined;
+          const updated = {
             ...p,
             isInventory: nextIsInventory,
-            stock: nextIsInventory ? (p.stock !== undefined ? p.stock : 20) : undefined,
+            stock: nextStock,
+            updatedAt: new Date().toISOString(),
           };
+          if (db) {
+            setDoc(doc(db, 'products', productId), updated, { merge: true }).catch((err) =>
+              console.warn('[Firestore] Product toggle inventory sync:', err)
+            );
+          }
+          return updated;
         }
         return p;
       })
@@ -1918,8 +2137,20 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateProductStock = (productId: string, newStock: number) => {
+    const validStock = Math.max(0, newStock);
     setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, stock: Math.max(0, newStock) } : p))
+      prev.map((p) => {
+        if (p.id === productId) {
+          const updated = { ...p, stock: validStock, updatedAt: new Date().toISOString() };
+          if (db) {
+            setDoc(doc(db, 'products', productId), { stock: validStock, updatedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
+              console.warn('[Firestore] Product stock update sync:', err)
+            );
+          }
+          return updated;
+        }
+        return p;
+      })
     );
   };
 
@@ -3058,6 +3289,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshOfflineTransactions();
       }).catch((e) => console.warn('[POSContext] recordOfflineSale err:', e));
 
+      // Also directly persist order to Firestore orders & sales collections
+      persistOrderToFirestore(newOrder).catch((e) =>
+        console.warn('[POSContext] persistOrderToFirestore err:', e)
+      );
+
       // Auto-print receipt to Wi-Fi printer if enabled
       if (printerConfig.enabled && printerConfig.autoPrintReceipt) {
         printReceiptToWifi(newOrder);
@@ -3065,7 +3301,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return newOrder;
     },
-    [activeCheckoutTarget, cart, cartTotals, currentBusiness, currentCashier, activeShift, orderType, selectedTable, selectedRoom, customerName, orderDiscountPercent, orderHistory.length, isOnline, printerConfig, refreshOfflineTransactions]
+    [activeCheckoutTarget, cart, cartTotals, currentBusiness, currentCashier, activeShift, orderType, selectedTable, selectedRoom, customerName, orderDiscountPercent, orderHistory.length, isOnline, printerConfig, refreshOfflineTransactions, persistOrderToFirestore]
   );
 
   const refundOrder = (orderId: string) => {
@@ -3074,6 +3310,15 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOrderHistory((prev) =>
       prev.map((ord) => (ord.id === orderId ? { ...ord, status: 'refunded' } : ord))
     );
+    if (db) {
+      setDoc(doc(db, 'orders', orderId), { status: 'refunded', updatedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Order refund sync:', err)
+      );
+      setDoc(doc(db, 'sales', orderId), { status: 'refunded', updatedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
+        console.warn('[Firestore] Sale refund sync:', err)
+      );
+    }
+    logAuditAction('ORDER_REFUNDED', `Refunded order ID ${orderId}`, orderId);
   };
 
   const updateTableStatus = (tableId: string, status: TableStatus) => {

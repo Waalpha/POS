@@ -118,6 +118,9 @@ export interface CashierUser {
   assignedPosId?: string;
   pinHash?: string; // SHA-256 hashed PIN with tenant salt for secure offline verification
   isAuthorizedOffline?: boolean;
+  tenantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PosDeviceRecord {

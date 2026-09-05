@@ -90,6 +90,71 @@
         "read": "true",
         "write": "true"
       }
+    },
+    "cashiers": {
+      "schema": {
+        "id": "string",
+        "tenantId": "string",
+        "name": "string",
+        "role": "string",
+        "pin": "string",
+        "avatarColor": "string",
+        "status": "string",
+        "phone": "string",
+        "email": "string",
+        "suspensionReason": "string",
+        "suspendedAt": "string",
+        "updatedAt": "string"
+      },
+      "permissions": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "suppliers": {
+      "schema": {
+        "id": "string",
+        "tenantId": "string",
+        "name": "string",
+        "contactPerson": "string",
+        "phone": "string",
+        "email": "string",
+        "address": "string"
+      },
+      "permissions": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "stockMovements": {
+      "schema": {
+        "id": "string",
+        "tenantId": "string",
+        "productId": "string",
+        "productName": "string",
+        "type": "string",
+        "quantityDelta": "number",
+        "timestamp": "string"
+      },
+      "permissions": {
+        "read": "true",
+        "write": "true"
+      }
+    },
+    "purchases": {
+      "schema": {
+        "id": "string",
+        "tenantId": "string",
+        "supplierId": "string",
+        "supplierName": "string",
+        "date": "string",
+        "totalAmount": "number",
+        "status": "string"
+      },
+      "permissions": {
+        "read": "true",
+        "write": "true"
+      }
     }
   },
   "firestore": {
