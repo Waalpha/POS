@@ -406,95 +406,6 @@ export const DailySalesReport: React.FC<DailySalesReportProps> = ({ onViewOrderR
     setTimeout(() => setCopiedSummary(false), 2500);
   };
 
-  // Seed sample orders for today if today has 0 orders
-  const handleSeedTodaySales = () => {
-    soundFx.playSuccess();
-    const sampleProds = products.length > 0 ? products : [];
-    if (sampleProds.length < 2) return;
-
-    const newOrders: OrderRecord[] = [
-      {
-        id: `ord-today-sample-${Date.now()}-1`,
-        orderNumber: `ORD-${Math.floor(1200 + Math.random() * 800)}`,
-        businessId: currentBusiness.id,
-        businessName: currentBusiness.name,
-        cashierId: cashiers[0]?.id || 'c-1',
-        cashierName: cashiers[0]?.name || 'Sarah Jenkins',
-        shiftId: 'shift-today',
-        createdAt: new Date(Date.now() - 4 * 3600000).toISOString(),
-        items: [
-          {
-            cartItemId: `item-s1-${Date.now()}`,
-            product: sampleProds[0],
-            quantity: 3,
-            selectedModifiers: [],
-            itemDiscountPercent: 0,
-            unitPrice: sampleProds[0].price,
-            totalPrice: sampleProds[0].price * 3,
-          },
-          {
-            cartItemId: `item-s2-${Date.now()}`,
-            product: sampleProds[Math.min(1, sampleProds.length - 1)],
-            quantity: 2,
-            selectedModifiers: [],
-            itemDiscountPercent: 0,
-            unitPrice: sampleProds[Math.min(1, sampleProds.length - 1)].price,
-            totalPrice: sampleProds[Math.min(1, sampleProds.length - 1)].price * 2,
-          },
-        ],
-        orderType: 'dine_in',
-        tableNumber: 'Table 4',
-        subtotal: (sampleProds[0].price * 3 + sampleProds[Math.min(1, sampleProds.length - 1)].price * 2) * 0.84,
-        taxAmount: (sampleProds[0].price * 3 + sampleProds[Math.min(1, sampleProds.length - 1)].price * 2) * 0.16,
-        discountAmount: 0,
-        discountPercent: 0,
-        totalAmount: sampleProds[0].price * 3 + sampleProds[Math.min(1, sampleProds.length - 1)].price * 2,
-        paymentMethod: 'mpesa',
-        mpesaRef: `QKB${Math.floor(100000 + Math.random() * 900000)}`,
-        status: 'completed',
-        billStatus: 'paid',
-        kitchenStatus: 'served',
-      },
-      {
-        id: `ord-today-sample-${Date.now()}-2`,
-        orderNumber: `ORD-${Math.floor(1200 + Math.random() * 800)}`,
-        businessId: currentBusiness.id,
-        businessName: currentBusiness.name,
-        cashierId: cashiers[1]?.id || cashiers[0]?.id || 'c-2',
-        cashierName: cashiers[1]?.name || 'David Mwangi',
-        shiftId: 'shift-today',
-        createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
-        items: [
-          {
-            cartItemId: `item-s3-${Date.now()}`,
-            product: sampleProds[Math.min(2, sampleProds.length - 1)],
-            quantity: 2,
-            selectedModifiers: [],
-            itemDiscountPercent: 0,
-            unitPrice: sampleProds[Math.min(2, sampleProds.length - 1)].price,
-            totalPrice: sampleProds[Math.min(2, sampleProds.length - 1)].price * 2,
-          },
-        ],
-        orderType: 'takeaway',
-        customerName: 'Kelvin Kariuki',
-        subtotal: sampleProds[Math.min(2, sampleProds.length - 1)].price * 2 * 0.84,
-        taxAmount: sampleProds[Math.min(2, sampleProds.length - 1)].price * 2 * 0.16,
-        discountAmount: 0,
-        discountPercent: 0,
-        totalAmount: sampleProds[Math.min(2, sampleProds.length - 1)].price * 2,
-        paymentMethod: 'cash',
-        amountTendered: sampleProds[Math.min(2, sampleProds.length - 1)].price * 2,
-        changeGiven: 0,
-        status: 'completed',
-        billStatus: 'paid',
-        kitchenStatus: 'served',
-      },
-    ];
-
-    setOrderHistory((prev) => [...newOrders, ...prev]);
-    setSelectedDate(todayStr);
-  };
-
   // Format Date for Title display
   const formattedSelectedDate = useMemo(() => {
     try {
@@ -569,17 +480,6 @@ export const DailySalesReport: React.FC<DailySalesReportProps> = ({ onViewOrderR
               {copiedSummary ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
               <span>{copiedSummary ? 'Copied!' : 'Copy Summary'}</span>
             </button>
-
-            {metrics.orderCount === 0 && selectedDate === todayStr && (
-              <button
-                onClick={handleSeedTodaySales}
-                className="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs rounded-xl border border-purple-200 flex items-center gap-1.5 cursor-pointer"
-                title="Add 2 sample completed orders for today to immediately test daily report"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Seed Sample Sales for Today</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -961,18 +861,9 @@ export const DailySalesReport: React.FC<DailySalesReportProps> = ({ onViewOrderR
               <div className="text-sm font-bold text-slate-700">No sold items match this filter for {selectedDate}</div>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
                 {orderHistory.length === 0
-                  ? 'No sales records exist yet in the POS. Complete orders from the register or click "Seed Sample Sales" to generate data.'
-                  : `There are no completed sales recorded on ${selectedDate}. Try selecting another date from the date shortcuts above.`}
+                  ? 'No sales records exist yet. Complete sales at the POS checkout register to track daily sold quantities and revenue here.'
+                  : `There are no completed sales recorded on ${selectedDate}. Select another date from the date shortcuts above or pick from the calendar.`}
               </p>
-              {selectedDate === todayStr && metrics.orderCount === 0 && (
-                <button
-                  onClick={handleSeedTodaySales}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-2 mt-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Load Sample Sales for Today</span>
-                </button>
-              )}
             </div>
           )}
         </div>

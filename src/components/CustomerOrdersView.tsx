@@ -20,6 +20,7 @@ import {
   ArrowRight,
   RefreshCw,
   Eye,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { OrderRecord, OrderType } from '../types/pos';
@@ -164,44 +165,59 @@ export const CustomerOrdersView: React.FC<CustomerOrdersViewProps> = ({ onOpenCh
           </div>
         </div>
 
-        {/* Tab Switcher: Active Unpaid vs Completed Today */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
-          <button
-            onClick={() => {
-              soundFx.playClick();
-              setActiveTab('active_unpaid');
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'active_unpaid'
-                ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-slate-300'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-            id="tab-btn-unpaid"
-          >
-            <Clock className="w-4 h-4 text-emerald-600" />
-            <span>Active Unpaid Orders</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900">
-              {activeUnpaidOrders.length}
-            </span>
-          </button>
+        {/* Actions: Tab Switcher & Full Day Report Shortcut */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+            <button
+              onClick={() => {
+                soundFx.playClick();
+                setActiveTab('active_unpaid');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'active_unpaid'
+                  ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-slate-300'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              id="tab-btn-unpaid"
+            >
+              <Clock className="w-4 h-4 text-emerald-600" />
+              <span>Active Unpaid Orders</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900">
+                {activeUnpaidOrders.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                soundFx.playClick();
+                setActiveTab('completed_today');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'completed_today'
+                  ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-300'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              id="tab-btn-today-receipts"
+            >
+              <Receipt className="w-4 h-4 text-slate-600" />
+              <span>Today's Receipts</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 text-slate-700">
+                {todayOrders.length}
+              </span>
+            </button>
+          </div>
 
           <button
             onClick={() => {
               soundFx.playClick();
-              setActiveTab('completed_today');
+              setCurrentView('reports');
             }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'completed_today'
-                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-300'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-            id="tab-btn-today-receipts"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-black transition-all shadow-xs cursor-pointer"
+            id="btn-goto-full-day-report"
+            title="Open Full Day Sales Report (Itemized what sold and revenue)"
           >
-            <Receipt className="w-4 h-4 text-slate-600" />
-            <span>Today's Receipts</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 text-slate-700">
-              {todayOrders.length}
-            </span>
+            <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+            <span>Full Day Sales Report</span>
           </button>
         </div>
       </div>

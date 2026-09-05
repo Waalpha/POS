@@ -35,10 +35,9 @@ import {
   INITIAL_CASHIERS,
   CATEGORIES,
   BUSINESS_CATEGORIES,
-  INITIAL_PRODUCTS,
   INITIAL_TABLES,
   INITIAL_HOTEL_ROOMS,
-  INITIAL_ORDER_HISTORY,
+  isHandcodedProduct,
 } from '../data/mockData';
 import { soundFx } from '../utils/audio';
 import {
@@ -901,39 +900,23 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (tenantStored) {
       try {
         const parsed = JSON.parse(tenantStored);
-        if (Array.isArray(parsed)) existing = parsed;
+        if (Array.isArray(parsed)) {
+          // Strictly remove any handcoded mock items
+          existing = parsed.filter((item) => !isHandcodedProduct(item));
+        }
       } catch {}
     }
 
-    const defaultItems = INITIAL_PRODUCTS.map((p) => ({
-      ...p,
-      id: `${tenantId}-${p.id}`,
-      tenantId,
-      businessId: tenantId,
-    }));
-
     if (isCleared) {
-      return existing;
+      return [];
     }
 
-    if (existing.length === 0) {
-      return defaultItems;
+    // Save cleaned list back if any handcoded items were stripped
+    if (tenantStored && existing.length !== (JSON.parse(tenantStored || '[]')?.length || 0)) {
+      localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(existing));
     }
 
-    // Merge any missing items from defaultItems (such as newly added Chemist & Pharmacy items) into existing items
-    const existingIds = new Set(existing.map((item) => item.id));
-    // Also check by name/SKU to prevent duplicates if IDs differ
-    const existingSkus = new Set(existing.map((item) => item.sku).filter(Boolean));
-    const existingNames = new Set(existing.map((item) => item.name.toLowerCase()));
-
-    const missingItems = defaultItems.filter((item) => {
-      if (existingIds.has(item.id)) return false;
-      if (item.sku && existingSkus.has(item.sku)) return false;
-      if (existingNames.has(item.name.toLowerCase())) return false;
-      return true;
-    });
-
-    return [...existing, ...missingItems];
+    return existing;
   };
 
   const [products, setProducts] = useState<ProductItem[]>(() => {
@@ -960,343 +943,80 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('davetech_active_orders');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((ord: OrderRecord) => {
+            return ord.items && ord.items.some((i) => !isHandcodedProduct(i.product));
+          });
+        }
       } catch {
         // fallback
       }
     }
-    return [
-      {
-        id: 'ord-active-1',
-        orderNumber: 'ORD-1095',
-        businessId: 'biz-1',
-        businessName: 'Davetech Hotel & Restaurant',
-        cashierId: 'c-1',
-        cashierName: 'Sarah Jenkins',
-        waiterName: 'Sarah Jenkins',
-        shiftId: 'shift-live',
-        createdAt: new Date(Date.now() - 12 * 60000).toISOString(),
-        items: [
-          {
-            cartItemId: 'sample-ug-1',
-            product: INITIAL_PRODUCTS[1] || INITIAL_PRODUCTS[0],
-            quantity: 2,
-            selectedModifiers: [],
-            itemDiscountPercent: 0,
-            unitPrice: 250,
-            totalPrice: 500,
-          },
-          {
-            cartItemId: 'sample-soda-1',
-            product: INITIAL_PRODUCTS[8] || INITIAL_PRODUCTS[0],
-            quantity: 2,
-            selectedModifiers: [],
-            itemDiscountPercent: 0,
-            unitPrice: 180,
-            totalPrice: 360,
-          },
-        ],
-        orderType: 'dine_in',
-        tableNumber: 'Table 2',
-        tableId: 'tbl-2',
-        customerName: 'Table 2 (James Mwangi)',
-        subtotal: 741.38,
-        taxAmount: 118.62,
-        discountAmount: 0,
-        discountPercent: 0,
-        totalAmount: 860,
-        paymentMethod: 'cash',
-        status: 'completed',
-        billStatus: 'unpaid',
-      },
-    ];
+    return [];
   });
 
   const [orderHistory, setOrderHistory] = useState<OrderRecord[]>(() => {
     const saved = localStorage.getItem('davetech_orders');
-    return saved ? JSON.parse(saved) : INITIAL_ORDER_HISTORY;
+    if (saved) {
+      try {
+        const parsed: OrderRecord[] = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((order) => {
+            const hasHandcoded = order.items?.some((item) => isHandcodedProduct(item.product));
+            return !hasHandcoded;
+          });
+        }
+      } catch {}
+    }
+    return [];
   });
 
   const [tables, setTables] = useState<TableInfo[]>(() => {
-    const saved = localStorage.getItem('davetech_tables');
+    const saved = localStorage.getItem("davetech_tables");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((t: TableInfo) => {
+            const hasHandcoded = t.activeItems?.some((i) => isHandcodedProduct(i.product));
+            if (hasHandcoded) {
+              return {
+                ...t,
+                status: "available",
+                activeGuests: undefined,
+                assignedWaiter: undefined,
+                openedAt: undefined,
+                activeOrderTotal: undefined,
+                rounds: [],
+                activeItems: [],
+              };
+            }
+            return t;
+          });
+        }
       } catch {
         return INITIAL_TABLES;
       }
     }
-    // Provide rich sample tables with active rounds
-    return [
-      {
-        id: 'tbl-1',
-        name: 'Table 1',
-        section: 'Main Hall',
-        seats: 2,
-        status: 'available',
-      },
-      {
-        id: 'tbl-2',
-        name: 'Table 2',
-        section: 'Main Hall',
-        seats: 4,
-        status: 'preparing',
-        activeGuests: 3,
-        assignedWaiter: 'Sarah Jenkins',
-        openedAt: new Date(Date.now() - 25 * 60000).toISOString(),
-        activeOrderTotal: 3400,
-        rounds: [
-          {
-            roundNumber: 1,
-            createdAt: new Date(Date.now() - 25 * 60000).toISOString(),
-            waiterName: 'Sarah Jenkins',
-            items: [
-              {
-                cartItemId: 'tbl2-item-1',
-                product: INITIAL_PRODUCTS[0], // Double Smash Burger
-                quantity: 2,
-                selectedModifiers: [{ groupName: 'Sides', selectedOption: 'Truffle Fries', extraPrice: 250 }],
-                itemDiscountPercent: 0,
-                itemNotes: 'Well done, extra sauce on side',
-                unitPrice: 1200,
-                totalPrice: 2400,
-                roundNumber: 1,
-                sentToKitchen: true,
-              },
-              {
-                cartItemId: 'tbl2-item-2',
-                product: INITIAL_PRODUCTS[6], // Caramel Macchiato
-                quantity: 2,
-                selectedModifiers: [{ groupName: 'Milk Choice', selectedOption: 'Oat Milk', extraPrice: 80 }],
-                itemDiscountPercent: 0,
-                unitPrice: 500,
-                totalPrice: 1000,
-                roundNumber: 1,
-                sentToKitchen: true,
-              },
-            ],
-          },
-        ],
-        activeItems: [
-          {
-            cartItemId: 'tbl2-item-1',
-            product: INITIAL_PRODUCTS[0],
-            quantity: 2,
-            selectedModifiers: [{ groupName: 'Sides', selectedOption: 'Truffle Fries', extraPrice: 250 }],
-            itemDiscountPercent: 0,
-            itemNotes: 'Well done, extra sauce on side',
-            unitPrice: 1200,
-            totalPrice: 2400,
-            roundNumber: 1,
-            sentToKitchen: true,
-          },
-          {
-            cartItemId: 'tbl2-item-2',
-            product: INITIAL_PRODUCTS[6],
-            quantity: 2,
-            selectedModifiers: [{ groupName: 'Milk Choice', selectedOption: 'Oat Milk', extraPrice: 80 }],
-            itemDiscountPercent: 0,
-            unitPrice: 500,
-            totalPrice: 1000,
-            roundNumber: 1,
-            sentToKitchen: true,
-          },
-        ],
-      },
-      {
-        id: 'tbl-3',
-        name: 'Table 3',
-        section: 'Main Hall',
-        seats: 4,
-        status: 'bill_requested',
-        activeGuests: 4,
-        assignedWaiter: 'David Mwangi',
-        openedAt: new Date(Date.now() - 45 * 60000).toISOString(),
-        activeOrderTotal: 5200,
-        billRequestedAt: new Date(Date.now() - 3 * 60000).toISOString(),
-        rounds: [
-          {
-            roundNumber: 1,
-            createdAt: new Date(Date.now() - 45 * 60000).toISOString(),
-            waiterName: 'David Mwangi',
-            items: [
-              {
-                cartItemId: 'tbl3-item-1',
-                product: INITIAL_PRODUCTS[1], // BBQ Ribs
-                quantity: 2,
-                selectedModifiers: [{ groupName: 'Portion', selectedOption: 'Full Rack (700g)', extraPrice: 800 }],
-                itemDiscountPercent: 0,
-                unitPrice: 2450,
-                totalPrice: 4900,
-                roundNumber: 1,
-                sentToKitchen: true,
-              },
-              {
-                cartItemId: 'tbl3-item-2',
-                product: INITIAL_PRODUCTS[8], // Sparkling Water
-                quantity: 2,
-                selectedModifiers: [],
-                itemDiscountPercent: 0,
-                unitPrice: 150,
-                totalPrice: 300,
-                roundNumber: 1,
-                sentToKitchen: true,
-              },
-            ],
-          },
-        ],
-        activeItems: [
-          {
-            cartItemId: 'tbl3-item-1',
-            product: INITIAL_PRODUCTS[1],
-            quantity: 2,
-            selectedModifiers: [{ groupName: 'Portion', selectedOption: 'Full Rack (700g)', extraPrice: 800 }],
-            itemDiscountPercent: 0,
-            unitPrice: 2450,
-            totalPrice: 4900,
-            roundNumber: 1,
-            sentToKitchen: true,
-          },
-          {
-            cartItemId: 'tbl3-item-2',
-            product: INITIAL_PRODUCTS[8],
-            quantity: 2,
-            selectedModifiers: [],
-            itemDiscountPercent: 0,
-            unitPrice: 150,
-            totalPrice: 300,
-            roundNumber: 1,
-            sentToKitchen: true,
-          },
-        ],
-      },
-      {
-        id: 'tbl-4',
-        name: 'Table 4',
-        section: 'Main Hall',
-        seats: 6,
-        status: 'ready',
-        activeGuests: 5,
-        assignedWaiter: 'Sarah Jenkins',
-        openedAt: new Date(Date.now() - 18 * 60000).toISOString(),
-        activeOrderTotal: 4600,
-        activeItems: [
-          {
-            cartItemId: 'tbl4-item-1',
-            product: INITIAL_PRODUCTS[2], // Margherita Pizza
-            quantity: 2,
-            selectedModifiers: [{ groupName: 'Crust', selectedOption: 'Stuffed Crust', extraPrice: 200 }],
-            itemDiscountPercent: 0,
-            itemNotes: 'Extra crispy',
-            unitPrice: 1350,
-            totalPrice: 2700,
-            roundNumber: 1,
-            sentToKitchen: true,
-          },
-          {
-            cartItemId: 'tbl4-item-2',
-            product: INITIAL_PRODUCTS[10], // Mojito
-            quantity: 2,
-            selectedModifiers: [{ groupName: 'Flavor', selectedOption: 'Passion Fruit', extraPrice: 50 }],
-            itemDiscountPercent: 0,
-            unitPrice: 750,
-            totalPrice: 1500,
-            roundNumber: 1,
-            sentToKitchen: true,
-          },
-          {
-            cartItemId: 'tbl4-item-3',
-            product: INITIAL_PRODUCTS[7], // Iced Hibiscus Tea
-            quantity: 1,
-            selectedModifiers: [],
-            itemDiscountPercent: 0,
-            unitPrice: 400,
-            totalPrice: 400,
-            roundNumber: 1,
-            sentToKitchen: true,
-          },
-        ],
-      },
-      { id: 'tbl-5', name: 'Table 5', section: 'Terrace', seats: 2, status: 'available' },
-      {
-        id: 'tbl-6',
-        name: 'Table 6',
-        section: 'Terrace',
-        seats: 4,
-        status: 'occupied',
-        activeGuests: 2,
-        assignedWaiter: 'David Mwangi',
-        activeOrderTotal: 2100,
-      },
-      { id: 'tbl-7', name: 'Table 7', section: 'Terrace', seats: 4, status: 'reserved' },
-      {
-        id: 'tbl-8',
-        name: 'VIP Lounge 1',
-        section: 'VIP Lounge',
-        seats: 8,
-        status: 'order_sent',
-        activeGuests: 6,
-        assignedWaiter: 'Sarah Jenkins',
-        activeOrderTotal: 14800,
-      },
-      { id: 'tbl-9', name: 'VIP Lounge 2', section: 'VIP Lounge', seats: 8, status: 'available' },
-      { id: 'tbl-10', name: 'Bar Stool 1', section: 'Bar Area', seats: 1, status: 'paid', activeOrderTotal: 850 },
-      { id: 'tbl-11', name: 'Bar Stool 2', section: 'Bar Area', seats: 1, status: 'available' },
-      { id: 'tbl-12', name: 'Bar Stool 3', section: 'Bar Area', seats: 1, status: 'available' },
-    ];
+    return INITIAL_TABLES;
   });
 
   const [hotelRooms, setHotelRooms] = useState<HotelRoomInfo[]>(INITIAL_HOTEL_ROOMS);
 
-  const [kdsTickets, setKdsTickets] = useState<KdsTicket[]>([
-    {
-      id: 'kds-1',
-      orderId: 'ord-seed-01',
-      orderNumber: 'ORD-1088',
-      tableOrRoom: 'Table 2',
-      orderType: 'dine_in',
-      serverName: 'Sarah Jenkins',
-      roundNumber: 1,
-      createdAt: new Date(Date.now() - 14 * 60000).toISOString(),
-      items: [
-        { name: 'Davetech Double Smash Burger', quantity: 2, modifiers: ['Truffle Fries'], notes: 'Well done, extra sauce' },
-        { name: 'Caramel Macchiato (Large)', quantity: 2, modifiers: ['Oat Milk'] },
-      ],
-      status: 'cooking',
-      elapsedMinutes: 14,
-    },
-    {
-      id: 'kds-2',
-      orderId: 'ord-tbl-4',
-      orderNumber: 'ORD-1094',
-      tableOrRoom: 'Table 4',
-      orderType: 'dine_in',
-      serverName: 'Sarah Jenkins',
-      roundNumber: 1,
-      createdAt: new Date(Date.now() - 18 * 60000).toISOString(),
-      items: [
-        { name: 'Artisan Margherita Pizza', quantity: 2, modifiers: ['Stuffed Crust'], notes: 'Extra crispy' },
-        { name: 'Signature Mojito Cocktail', quantity: 2, modifiers: ['Passion Fruit'] },
-        { name: 'Iced Hibiscus Berry Tea', quantity: 1 },
-      ],
-      status: 'ready',
-      elapsedMinutes: 18,
-    },
-  ]);
+  const [kdsTickets, setKdsTickets] = useState<KdsTicket[]>(() => {
+    const saved = localStorage.getItem('davetech_kds_tickets');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return [];
+  });
 
   // Waiter Ready Notifications
-  const [waiterNotifications, setWaiterNotifications] = useState<WaiterReadyNotification[]>([
-    {
-      id: 'notif-1',
-      ticketId: 'kds-2',
-      tableOrRoom: 'Table 4',
-      orderNumber: 'ORD-1094',
-      waiterName: 'Sarah Jenkins',
-      readyTime: new Date(Date.now() - 2 * 60000).toISOString(),
-      itemsSummary: '2x Margherita Pizza, 2x Mojito, 1x Berry Tea',
-      acknowledged: false,
-    },
-  ]);
+  const [waiterNotifications, setWaiterNotifications] = useState<WaiterReadyNotification[]>([]);
 
   // Customer Pro-Forma Bill Modal State
   const [showCustomerBillModal, setShowCustomerBillModal] = useState<boolean>(false);
@@ -1376,7 +1096,8 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const localCached = await getCachedProductsFromDb(tenantId);
         if (localCached && localCached.length > 0) {
-          setProducts(localCached);
+          const cleanLocal = localCached.filter((item) => !isHandcodedProduct(item));
+          setProducts(cleanLocal);
         }
       } catch {}
 
@@ -1386,60 +1107,38 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const snap = await getDocs(q);
 
         if (!snap.empty) {
-          const items: ProductItem[] = snap.docs.map((docSnap) => ({
+          const rawItems: ProductItem[] = snap.docs.map((docSnap) => ({
             ...docSnap.data(),
             id: docSnap.id,
             tenantId,
             businessId: tenantId,
           } as ProductItem));
 
-          const defaultItems = INITIAL_PRODUCTS.map((p) => ({
-            ...p,
-            id: `${tenantId}-${p.id}`,
-            tenantId,
-            businessId: tenantId,
-          }));
-
-          const existingIds = new Set(items.map((item) => item.id));
-          const existingSkus = new Set(items.map((item) => item.sku).filter(Boolean));
-          const existingNames = new Set(items.map((item) => item.name.toLowerCase()));
-
-          const missingItems = defaultItems.filter((item) => {
-            if (existingIds.has(item.id)) return false;
-            if (item.sku && existingSkus.has(item.sku)) return false;
-            if (existingNames.has(item.name.toLowerCase())) return false;
-            return true;
-          });
-
-          const mergedItems = [...items, ...missingItems];
-          setProducts(mergedItems);
-          localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(mergedItems));
-          await cacheProductsToDb(mergedItems, tenantId);
-
-          if (missingItems.length > 0) {
-            Promise.all(
-              missingItems.map((prod) => setDoc(doc(db, 'products', prod.id), prod, { merge: true }))
-            ).catch(() => {});
+          // Purge handcoded products from Firestore collection so they NEVER resurrect
+          const handcodedDocIds = snap.docs
+            .filter((d) => isHandcodedProduct(d.data()) || isHandcodedProduct({ id: d.id, ...d.data() }))
+            .map((d) => d.id);
+          if (handcodedDocIds.length > 0) {
+            handcodedDocIds.forEach((docId) => {
+              deleteDoc(doc(db, 'products', docId)).catch(() => {});
+            });
           }
-        } else if (isCleared) {
-          setProducts([]);
-          await cacheProductsToDb([], tenantId);
-        } else {
-          // Brand new tenant with initial mock products
-          const initial = INITIAL_PRODUCTS.map((p) => ({
-            ...p,
-            id: `${tenantId}-${p.id}`,
-            tenantId,
-            businessId: tenantId,
-          }));
-          setProducts(initial);
-          localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(initial));
-          await cacheProductsToDb(initial, tenantId);
 
-          // Seed to Firestore once
-          Promise.all(
-            initial.map((prod) => setDoc(doc(db, 'products', prod.id), prod, { merge: true }))
-          ).catch(() => {});
+          const cleanItems = rawItems.filter((item) => !isHandcodedProduct(item));
+
+          if (isCleared) {
+            setProducts([]);
+            localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify([]));
+            await cacheProductsToDb([], tenantId);
+          } else {
+            setProducts(cleanItems);
+            localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify(cleanItems));
+            await cacheProductsToDb(cleanItems, tenantId);
+          }
+        } else {
+          setProducts([]);
+          localStorage.setItem(`davetech_products_${tenantId}`, JSON.stringify([]));
+          await cacheProductsToDb([], tenantId);
         }
       }
     } catch (err) {
@@ -1447,7 +1146,8 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const localCached = await getCachedProductsFromDb(tenantId);
         if (localCached && localCached.length > 0) {
-          setProducts(localCached);
+          const cleanLocal = localCached.filter((item) => !isHandcodedProduct(item));
+          setProducts(cleanLocal);
         }
       } catch {}
     } finally {
@@ -2254,6 +1954,24 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // 7. Clear cart to prevent stale references
       clearCart();
+
+      // 8. Clear active unpaid orders and reset table assignments
+      setActiveUnpaidOrders([]);
+      localStorage.setItem(`davetech_unpaid_orders_${targetTenantId}`, JSON.stringify([]));
+      setTables((prev) =>
+        prev.map((t) => ({
+          ...t,
+          status: 'available',
+          activeGuests: undefined,
+          assignedWaiter: undefined,
+          openedAt: undefined,
+          activeOrderTotal: undefined,
+          rounds: [],
+          activeItems: [],
+        }))
+      );
+      setKdsTickets([]);
+      setWaiterNotifications([]);
 
       // 8. Record audit log
       const actorId = auth.currentUser?.uid || currentCashier?.id || 'mgr-authorized';
