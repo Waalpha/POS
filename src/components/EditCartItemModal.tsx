@@ -16,7 +16,7 @@ import { usePOS } from '../context/POSContext';
 import { CartModifierSelection } from '../types/pos';
 import { soundFx } from '../utils/audio';
 
-const COMMON_NOTE_TAGS = [
+const KITCHEN_NOTE_TAGS = [
   'No Onions',
   'Extra Spicy',
   'Mild',
@@ -29,6 +29,24 @@ const COMMON_NOTE_TAGS = [
   'Room Delivery',
 ];
 
+const CHEMIST_NOTE_TAGS = [
+  'Take with Food',
+  'Before Bed',
+  'As Needed',
+  'External Use',
+  'Complete Dosage',
+  'Shake Well',
+  'Before Meals',
+];
+
+const RETAIL_NOTE_TAGS = [
+  'Gift Wrap',
+  'Fragile',
+  'Express Delivery',
+  'Customer Request',
+  'Call Before Delivery',
+];
+
 export const EditCartItemModal: React.FC = () => {
   const {
     editingCartItem,
@@ -36,7 +54,16 @@ export const EditCartItemModal: React.FC = () => {
     updateCartItem,
     removeCartItem,
     currencySymbol,
+    currentBusiness,
   } = usePOS();
+
+  const isChemist = currentBusiness?.mode === 'chemist';
+  const isFoodService = ['restaurant', 'bar', 'hotel'].includes(currentBusiness?.mode || '');
+
+  const noteTags = isChemist ? CHEMIST_NOTE_TAGS : isFoodService ? KITCHEN_NOTE_TAGS : RETAIL_NOTE_TAGS;
+  const notesTitle = isChemist ? 'Prescription & Dosage Instructions' : isFoodService ? 'Kitchen & Order Instructions' : 'Item & Order Notes';
+  const notesSubtitle = isChemist ? 'Prints on prescription receipt' : isFoodService ? 'Prints on KDS & kitchen docket' : 'Order notes';
+  const notesPlaceholder = isChemist ? 'Add prescription instructions (e.g., 1 tablet twice daily)...' : isFoodService ? 'Add custom preparation instructions (e.g., sauce on the side, no ice)...' : 'Add item notes or instructions...';
 
   const [quantity, setQuantity] = useState<number>(1);
   const [unitPrice, setUnitPrice] = useState<number>(0);
@@ -363,19 +390,19 @@ export const EditCartItemModal: React.FC = () => {
             </div>
           )}
 
-          {/* 5. KITCHEN / SERVER NOTES */}
+          {/* 5. NOTES & INSTRUCTIONS */}
           <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
             <div className="flex items-center justify-between font-bold text-slate-700">
               <span className="flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                Kitchen & Order Instructions
+                {notesTitle}
               </span>
-              <span className="text-[10px] text-slate-400">Prints on KDS & kitchen docket</span>
+              <span className="text-[10px] text-slate-400">{notesSubtitle}</span>
             </div>
 
             {/* Quick tags */}
             <div className="flex flex-wrap gap-1.5">
-              {COMMON_NOTE_TAGS.map((tag) => {
+              {noteTags.map((tag) => {
                 const isActive = itemNotes.includes(tag);
                 return (
                   <button
@@ -384,7 +411,7 @@ export const EditCartItemModal: React.FC = () => {
                     onClick={() => handleNoteTagClick(tag)}
                     className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-amber-500 text-white shadow-xs'
+                        ? 'bg-emerald-600 text-white shadow-xs'
                         : 'bg-white hover:bg-slate-200 text-slate-600 border border-slate-200'
                     }`}
                   >
@@ -398,7 +425,7 @@ export const EditCartItemModal: React.FC = () => {
               rows={2}
               value={itemNotes}
               onChange={(e) => setItemNotes(e.target.value)}
-              placeholder="Add custom preparation instructions (e.g., sauce on the side, no ice)..."
+              placeholder={notesPlaceholder}
               className="w-full p-2.5 bg-white text-slate-900 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-inner"
             />
           </div>
