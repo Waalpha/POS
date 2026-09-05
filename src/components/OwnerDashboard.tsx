@@ -60,6 +60,7 @@ import { Daraja3SettingsCard } from './Daraja3SettingsCard';
 import { ResetPaymentsModal } from './ResetPaymentsModal';
 import { ClearAllItemsModal } from './ClearAllItemsModal';
 import { ImportProductsModal } from './ImportProductsModal';
+import { DailySalesReport } from './DailySalesReport';
 
 type DashboardTabType =
   | 'overview'
@@ -123,6 +124,9 @@ export const OwnerDashboard: React.FC = () => {
     else if (currentView === 'settings') setActiveTab('settings');
     else if (currentView === 'dashboard') setActiveTab('overview');
   }, [currentView]);
+
+  // Reports & Sales Ledger Sub-view
+  const [reportSubTab, setReportSubTab] = useState<'daily_summary' | 'ledger'>('daily_summary');
 
   // Sales Ledger Filters
   const [ledgerSearch, setLedgerSearch] = useState('');
@@ -1426,105 +1430,164 @@ export const OwnerDashboard: React.FC = () => {
             ======================================================== */}
         {activeTab === 'reports' && (
           <div className="space-y-4">
-            {/* Filter Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={ledgerSearch}
-                  onChange={(e) => setLedgerSearch(e.target.value)}
-                  placeholder="Search receipt #, cashier name, M-Pesa code or customer..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 text-slate-900 placeholder:text-slate-400 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+            {/* Sub-tab Navigation */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <button
+                  onClick={() => {
+                    soundFx.playClick();
+                    setReportSubTab('daily_summary');
+                  }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    reportSubTab === 'daily_summary'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  id="tab-sub-daily-report"
+                >
+                  <FileBarChart className="w-4 h-4" />
+                  <span>Full Day Sales Report (What Sold & How Much)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    soundFx.playClick();
+                    setReportSubTab('ledger');
+                  }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    reportSubTab === 'ledger'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  id="tab-sub-orders-ledger"
+                >
+                  <Receipt className="w-4 h-4" />
+                  <span>All Transaction Receipts & Ledger ({orderHistory.length})</span>
+                </button>
               </div>
 
-              <select
-                value={ledgerPaymentFilter}
-                onChange={(e) => setLedgerPaymentFilter(e.target.value)}
-                className="px-3 py-2 bg-white text-slate-700 text-xs font-bold rounded-xl border border-slate-200 focus:outline-none shadow-xs"
-              >
-                <option value="all">All Payment Methods</option>
-                <option value="cash">Cash Only</option>
-                <option value="mpesa">M-Pesa Only</option>
-                <option value="card">Card Only</option>
-                <option value="room_charge">Room Charge</option>
-              </select>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  onClick={handleExportCSV}
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Export All Orders</span>
+                </button>
+              </div>
             </div>
 
-            {/* Sales Table */}
-            <div className="p-4 bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-xs">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 font-semibold">
-                    <th className="pb-2">Order #</th>
-                    <th className="pb-2">Date & Time</th>
-                    <th className="pb-2">Cashier</th>
-                    <th className="pb-2">Type / Location</th>
-                    <th className="pb-2">Payment</th>
-                    <th className="pb-2 text-right">Total Amount</th>
-                    <th className="pb-2 text-right">Status</th>
-                    <th className="pb-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredLedger.map((ord) => (
-                    <tr key={ord.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 font-bold text-slate-900 font-mono">{ord.orderNumber}</td>
-                      <td className="py-3 text-slate-500">
-                        {new Date(ord.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                      </td>
-                      <td className="py-3 text-slate-700 font-semibold">{ord.cashierName}</td>
-                      <td className="py-3 text-slate-500">
-                        {ord.tableNumber || ord.roomNumber ? `Room ${ord.roomNumber}` : ord.customerName || ord.orderType}
-                      </td>
-                      <td className="py-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200">
-                          {ord.paymentMethod}
-                          {ord.mpesaRef && ` (${ord.mpesaRef})`}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right font-black text-emerald-700">
-                        {currencySymbol} {ord.totalAmount.toLocaleString()}
-                      </td>
-                      <td className="py-3 text-right">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            ord.status === 'completed'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}
-                        >
-                          {ord.status.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              soundFx.playClick();
-                              setLastCompletedOrder(ord);
-                              setShowReceiptModal(true);
-                            }}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 cursor-pointer"
-                          >
-                            Receipt
-                          </button>
-                          {ord.status === 'completed' && (
-                            <button
-                              onClick={() => refundOrder(ord.id)}
-                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold rounded-lg border border-rose-200 cursor-pointer"
+            {reportSubTab === 'daily_summary' ? (
+              <DailySalesReport
+                onViewOrderReceipt={(ord) => {
+                  soundFx.playClick();
+                  setLastCompletedOrder(ord);
+                  setShowReceiptModal(true);
+                }}
+              />
+            ) : (
+              <div className="space-y-4">
+                {/* Filter Bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={ledgerSearch}
+                      onChange={(e) => setLedgerSearch(e.target.value)}
+                      placeholder="Search receipt #, cashier name, M-Pesa code or customer..."
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 text-slate-900 placeholder:text-slate-400 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <select
+                    value={ledgerPaymentFilter}
+                    onChange={(e) => setLedgerPaymentFilter(e.target.value)}
+                    className="px-3 py-2 bg-white text-slate-700 text-xs font-bold rounded-xl border border-slate-200 focus:outline-none shadow-xs"
+                  >
+                    <option value="all">All Payment Methods</option>
+                    <option value="cash">Cash Only</option>
+                    <option value="mpesa">M-Pesa Only</option>
+                    <option value="card">Card Only</option>
+                    <option value="room_charge">Room Charge</option>
+                  </select>
+                </div>
+
+                {/* Sales Table */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-xs">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500 font-semibold">
+                        <th className="pb-2">Order #</th>
+                        <th className="pb-2">Date & Time</th>
+                        <th className="pb-2">Cashier</th>
+                        <th className="pb-2">Type / Location</th>
+                        <th className="pb-2">Payment</th>
+                        <th className="pb-2 text-right">Total Amount</th>
+                        <th className="pb-2 text-right">Status</th>
+                        <th className="pb-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredLedger.map((ord) => (
+                        <tr key={ord.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 font-bold text-slate-900 font-mono">{ord.orderNumber}</td>
+                          <td className="py-3 text-slate-500">
+                            {new Date(ord.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </td>
+                          <td className="py-3 text-slate-700 font-semibold">{ord.cashierName}</td>
+                          <td className="py-3 text-slate-500">
+                            {ord.tableNumber || ord.roomNumber ? `Room ${ord.roomNumber}` : ord.customerName || ord.orderType}
+                          </td>
+                          <td className="py-3">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200">
+                              {ord.paymentMethod}
+                              {ord.mpesaRef && ` (${ord.mpesaRef})`}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right font-black text-emerald-700">
+                            {currencySymbol} {ord.totalAmount.toLocaleString()}
+                          </td>
+                          <td className="py-3 text-right">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                ord.status === 'completed'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-rose-100 text-rose-800'
+                              }`}
                             >
-                              Refund
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                              {ord.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  soundFx.playClick();
+                                  setLastCompletedOrder(ord);
+                                  setShowReceiptModal(true);
+                                }}
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 cursor-pointer"
+                              >
+                                Receipt
+                              </button>
+                              {ord.status === 'completed' && (
+                                <button
+                                  onClick={() => refundOrder(ord.id)}
+                                  className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold rounded-lg border border-rose-200 cursor-pointer"
+                                >
+                                  Refund
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
